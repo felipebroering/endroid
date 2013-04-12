@@ -15,7 +15,8 @@ physics.start(); physics.pause()
 
 -- forward declarations and other locals
 local screenW, screenH, halfW = display.contentWidth, display.contentHeight, display.contentWidth*0.5
-local car, leftArrow, rightArrow
+local car, leftArrow, rightArrow, street1, street2, street3
+local streetInitialPosition
 local movingCarDirection
 
 -----------------------------------------------------------------------------------------
@@ -53,8 +54,19 @@ function scene:createScene( event )
 	local group = self.view
 
 	-- create a grey rectangle as the backdrop
-	local background = display.newRect( 0, 0, screenW, screenH )
-	background:setFillColor( 128 )
+	street1 = display.newImageRect( "images/street.png" , 320, 480)
+	street1.x = screenW / 2
+	street1.y = screenH / 2
+
+	street2 = display.newImageRect( "images/street.png" , 320, 480)
+	street2.x = street1.x
+	street2.y = street1.y - street2.height
+
+	street3 = display.newImageRect( "images/street.png" , 320, 480)
+	street3.x = street1.x
+	street3.y = street2.y - street3.height
+
+	streetInitialPosition = street3.y + 10
 
 	car = display.newImageRect( "images/red_car.png", 34, 56)
 	car.x = screenW / 2 
@@ -89,9 +101,13 @@ function scene:createScene( event )
 	-- physics.addBody( grass, "static", { friction=0.3, shape=grassShape } )
 	
 	-- -- all display objects must be inserted into group
-	group:insert( background )
+	group:insert( street1 )
+	group:insert( street2 )
+	group:insert( street3 )
 	-- group:insert( crate )
 	group:insert( car )
+	group:insert( leftArrow )
+	group:insert( rightArrow )
 	
 	leftArrow:addEventListener( "touch", onLeftArrowTouch )
 	rightArrow:addEventListener( "touch", onRightArrowTouch )
@@ -122,6 +138,24 @@ function scene:destroyScene( event )
 end
 
 local function onEnterFrame( event )
+	street1.y = street1.y + 10
+	street2.y = street2.y + 10
+	street3.y = street3.y + 10
+
+	print(streetInitialPosition)
+
+	if street1.y - 240 > 480 then
+		street1.y = streetInitialPosition
+	end
+
+	if street2.y - 240 > 480 then
+		street2.y = streetInitialPosition
+	end
+
+	if street3.y - 240 > 480 then
+		street3.y = streetInitialPosition
+	end
+
 	local speed = 5
 
 	if movingCarDirection == "RIGHT" then
