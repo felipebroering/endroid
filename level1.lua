@@ -9,15 +9,19 @@ local scene = storyboard.newScene()
 
 -- include Corona's "physics" library
 local physics = require "physics"
-physics.start(); physics.pause()
+physics.start(); physics.pause(); physics.setGravity(0,0);
 
 --------------------------------------------
 
 -- forward declarations and other locals
 local screenW, screenH, halfW = display.contentWidth, display.contentHeight, display.contentWidth*0.5
-local car, leftArrow, rightArrow, street1, street2, street3
+local leftArrow, rightArrow, street1, street2, street3
 local streetInitialPosition
 local movingCarDirection
+
+local heroCar, car
+local visibleCars = {}
+local points = 0
 
 -----------------------------------------------------------------------------------------
 -- BEGINNING OF YOUR IMPLEMENTATION
@@ -47,11 +51,16 @@ local function onRightArrowTouch( event )
     	movingCarDirection = "STOPED"
     end
     return true
-end 
+end
+
 
 -- Called when the scene's view does not exist:
 function scene:createScene( event )
-	local group = self.view
+	 group = self.view
+
+	function getXPosition()
+		return math.random(40,280);
+	end	
 
 	-- create a grey rectangle as the backdrop
 	street1 = display.newImageRect( "images/street.png" , 320, 480)
@@ -68,10 +77,34 @@ function scene:createScene( event )
 
 	streetInitialPosition = street3.y + 10
 
-	car = display.newImageRect( "images/red_car.png", 34, 56)
-	car.x = screenW / 2 
-	car.y = screenH - 100
-	physics.addBody( car, 'static', { density=1.0, friction=0.3, bounce=0.3 } )
+	heroCar = display.newImageRect( "images/red_car.png", 34, 56)
+	heroCar.x = screenW / 2 
+	heroCar.y = screenH - 100
+	physics.addBody( heroCar, 'static', { density=1.0, friction=0.3, bounce=0.3 } )
+
+	--greenCar = display.newImageRect("images/red_car.png", 34, 56)
+	--greenCar.x = getXPosition()
+--	greenCar.y = -140
+--	greenCar.velocity = 5
+--	physics.addBody( greenCar, { density=1.0, friction=0.3, bounce=0.3 } )
+
+--	yellowCar = display.newImageRect("images/red_car.png", 34, 56)
+--	yellowCar.x = getXPosition()
+--	yellowCar.y = -200
+--	yellowCar.velocity = 3
+--	physics.addBody( yellowCar, { density=1.0, friction=0.3, bounce=0.3 } )	
+
+--	whiteCar = display.newImageRect("images/red_car.png", 34, 56)
+--	whiteCar.x = getXPosition()
+--	whiteCar.y = -200
+--	whiteCar.velocity = 8
+--	physics.addBody( whiteCar, { density=1.0, friction=0.3, bounce=0.3 } )	
+
+	cars = {}
+
+	cars[0] =  {velocity = 5, color = 'red'}
+	cars[1] = {velocity = 8, color = 'red'}
+	cars[2] = {velocity = 3, color = 'red'}
 
 	leftArrow = display.newImageRect( "images/left_arrow.png", 60, 30)
 	leftArrow.x = 40
@@ -105,13 +138,28 @@ function scene:createScene( event )
 	group:insert( street2 )
 	group:insert( street3 )
 	-- group:insert( crate )
-	group:insert( car )
+	group:insert( heroCar )
+	--group:insert( greenCar )
+	--group:insert( yellowCar )
+	--group:insert( whiteCar )	
 	group:insert( leftArrow )
 	group:insert( rightArrow )
+
 	
 	leftArrow:addEventListener( "touch", onLeftArrowTouch )
 	rightArrow:addEventListener( "touch", onRightArrowTouch )
 end
+
+function carFactory()
+		local carNumber = math.random(0,2)
+		car = display.newImageRect("images/".. cars[carNumber].color .. "_car.png", 34, 56)
+    	car.x = getXPosition()
+    	car.y = math.random(200, 1000) * -1
+    	car.velocity = cars[carNumber].velocity
+ 		physics.addBody( car, { density=1.0, friction=0.3, bounce=0.3 } )
+ 		return car	
+	
+end	
 
 -- Called immediately after scene has moved onscreen:
 function scene:enterScene( event )
@@ -138,11 +186,28 @@ function scene:destroyScene( event )
 end
 
 local function onEnterFrame( event )
-	street1.y = street1.y + 10
-	street2.y = street2.y + 10
-	street3.y = street3.y + 10
+	local streetSpeed = 10
+	street1.y = street1.y + streetSpeed
+	street2.y = street2.y + streetSpeed
+	street3.y = street3.y + streetSpeed
 
-	print(streetInitialPosition)
+    if table.getn(visibleCars) < 10 then
+    	table.insert(visibleCars, carFactory());
+    end	
+
+    local removedCars = {}
+    for i = 1, table.getn(visibleCars) do
+		visibleCars[i].y = visibleCars[i].y + visibleCars[i].velocity 
+    	if visibleCars[i].y - 240 > 480 then
+    		table.insert(removedCars, i) 
+    		--table.remove(visibleCars, i)
+    		--visibleCars[i].y = -140
+    		--visibleCars[i].x = getXPosition()
+    	end
+    end
+    for i = 1, table.getn(removedCars) do
+    	table.remove(visibleCars, removedCars[i])
+    end
 
 	if street1.y - 240 > 480 then
 		street1.y = streetInitialPosition
@@ -159,10 +224,17 @@ local function onEnterFrame( event )
 	local speed = 5
 
 	if movingCarDirection == "RIGHT" then
-	  	car.x = car.x + speed
-    elseif movingCarDirection == "LEFT" then
-    	car.x = car.x - speed
-    end
+		if heroCar.x <= 280 then
+			heroCar.x = heroCar.x + speed
+		end
+
+	elseif movingCarDirection == "LEFT" then
+			if heroCar.x >= 40 then
+			heroCar.x = heroCar.x - speed
+		    end
+	end
+
+
 end
 
 -----------------------------------------------------------------------------------------
