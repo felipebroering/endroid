@@ -102,9 +102,9 @@ function scene:createScene( event )
 
 	cars = {}
 
-	cars[0] =  {velocity = 5, color = 'red'}
-	cars[1] = {velocity = 8, color = 'red'}
-	cars[2] = {velocity = 3, color = 'red'}
+	cars[0] =  {velocity = 5, color = 'blue'}
+	cars[1] = {velocity = 8, color = 'white'}
+	cars[2] = {velocity = 3, color = 'yellow'}
 
 	leftArrow = display.newImageRect( "images/left_arrow.png", 60, 30)
 	leftArrow.x = 40
@@ -154,7 +154,7 @@ function carFactory()
 		local carNumber = math.random(0,2)
 		car = display.newImageRect("images/".. cars[carNumber].color .. "_car.png", 34, 56)
     	car.x = getXPosition()
-    	car.y = math.random(200, 1000) * -1
+    	car.y = math.random(200, 600) * -1
     	car.velocity = cars[carNumber].velocity
  		physics.addBody( car, { density=1.0, friction=0.3, bounce=0.3 } )
  		return car	
@@ -191,7 +191,7 @@ local function onEnterFrame( event )
 	street2.y = street2.y + streetSpeed
 	street3.y = street3.y + streetSpeed
 
-    if table.getn(visibleCars) < 10 then
+    if table.getn(visibleCars) < 3 then
     	table.insert(visibleCars, carFactory());
     end	
 
