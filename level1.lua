@@ -17,11 +17,14 @@ physics.start(); physics.pause(); physics.setGravity(0,0);
 local screenW, screenH, halfW = display.contentWidth, display.contentHeight, display.contentWidth*0.5
 local leftArrow, rightArrow, street1, street2, street3
 local streetInitialPosition
-local movingCarDirection
+local movingCarDirection, group
 
 local heroCar, car
 local visibleCars = {}
 local points = 0
+local pointsText
+local passPoints = 30
+local carSpeed = 0
 
 -----------------------------------------------------------------------------------------
 -- BEGINNING OF YOUR IMPLEMENTATION
@@ -33,24 +36,24 @@ local points = 0
 
 local function onLeftArrowTouch( event )
 	if event.phase == 'began' then
-    	movingCarDirection = "LEFT"
-    end
+  	movingCarDirection = "LEFT"
+  end
 
-    if event.phase == 'ended' then
-    	movingCarDirection = "STOPED"
-    end
-    return true
+  if event.phase == 'ended' then
+  	movingCarDirection = "STOPED"
+  end
+  return true
 end 
 
 local function onRightArrowTouch( event )
 	if event.phase == 'began' then
-    	movingCarDirection = "RIGHT"
-    end
-    
-    if event.phase == 'ended' then
-    	movingCarDirection = "STOPED"
-    end
-    return true
+  	movingCarDirection = "RIGHT"
+  end
+  
+  if event.phase == 'ended' then
+  	movingCarDirection = "STOPED"
+  end
+  return true
 end
 
 
@@ -59,8 +62,11 @@ function scene:createScene( event )
 	 group = self.view
 
 	function getXPosition()
-		return math.random(40,280);
+		return math.random(40,280)
 	end	
+
+	--native.systemFontBold
+	pointsText = display.newText(points, 150, 0, native.systemFontBold, 32)
 
 	-- create a grey rectangle as the backdrop
 	street1 = display.newImageRect( "images/street.png" , 320, 480)
@@ -80,6 +86,8 @@ function scene:createScene( event )
 	heroCar = display.newImageRect( "images/red_car.png", 34, 56)
 	heroCar.x = screenW / 2 
 	heroCar.y = screenH - 100
+	heroCar.speed = 1
+	heroCar.myName = "carHero"
 	physics.addBody( heroCar, 'static', { density=1.0, friction=0.3, bounce=0.3 } )
 
 	--greenCar = display.newImageRect("images/red_car.png", 34, 56)
@@ -102,9 +110,9 @@ function scene:createScene( event )
 
 	cars = {}
 
-	cars[0] =  {velocity = 5, color = 'blue'}
-	cars[1] = {velocity = 8, color = 'white'}
-	cars[2] = {velocity = 3, color = 'yellow'}
+	cars[0] =  {velocity = 5, color = 'blue', points = 30}
+	cars[1] = {velocity = 8, color = 'white', points = 50}
+	cars[2] = {velocity = 3, color = 'yellow', points = 70}
 
 	leftArrow = display.newImageRect( "images/left_arrow.png", 60, 30)
 	leftArrow.x = 40
@@ -144,6 +152,7 @@ function scene:createScene( event )
 	--group:insert( whiteCar )	
 	group:insert( leftArrow )
 	group:insert( rightArrow )
+	group:insert( pointsText )
 
 	
 	leftArrow:addEventListener( "touch", onLeftArrowTouch )
@@ -151,15 +160,26 @@ function scene:createScene( event )
 end
 
 function carFactory()
-		local carNumber = math.random(0,2)
-		car = display.newImageRect("images/".. cars[carNumber].color .. "_car.png", 34, 56)
-    	car.x = getXPosition()
-    	car.y = math.random(200, 600) * -1
-    	car.velocity = cars[carNumber].velocity
- 		physics.addBody( car, { density=1.0, friction=0.3, bounce=0.3 } )
- 		return car	
+	local carNumber = math.random(0,2)
+	car = display.newImageRect("images/".. cars[carNumber].color .. "_car.png", 34, 56)
+	car.x = getXPosition()
+	car.y = math.random(200, 600) * -1
+	car.pointsComputed = false
+	car.velocity = cars[carNumber].velocity
+	physics.addBody( car, { density=1.0, friction=0.3, bounce=0.3 } )
+  car.myName = "carEnemy"
+	return car	
 	
-end	
+end
+
+function incrementPoints()
+	points = points + passPoints
+ 	pointsText.text = points
+end
+
+function speed(value)
+	return value + carSpeed
+end
 
 -- Called immediately after scene has moved onscreen:
 function scene:enterScene( event )
@@ -177,6 +197,28 @@ function scene:exitScene( event )
 	
 end
 
+
+local function onCollision( event )
+  if ( event.phase == "began" ) then
+			if (event.object1.myName == 'carHero' and event.object2.myName == 'carEnemy') then
+				carSpeed = (carSpeed / 2)
+				print('bateu morreu, bateu dead')
+			elseif (event.object1.myName == 'carEnemy' and event.object2.myName == 'carEnemy') then	
+			if (event.object1.y > 0 and event.object1.y < heroCar.y) then
+					 event.object1.velocity = (streetSpeed/2)
+					--event.object2.velocity = event.object2.velocity + 10 
+				end
+				print('inimigos se batendo')
+			end
+          
+
+  elseif ( event.phase == "ended" ) then
+
+
+  end
+end
+
+
 -- If scene's view is removed, scene:destroyScene() will be called just prior to:
 function scene:destroyScene( event )
 	local group = self.view
@@ -186,28 +228,39 @@ function scene:destroyScene( event )
 end
 
 local function onEnterFrame( event )
-	local streetSpeed = 10
+	carSpeed = carSpeed + 0.1 / 15
+
+	streetSpeed = speed(10)
 	street1.y = street1.y + streetSpeed
 	street2.y = street2.y + streetSpeed
 	street3.y = street3.y + streetSpeed
 
-    if table.getn(visibleCars) < 3 then
-    	table.insert(visibleCars, carFactory());
-    end	
+  if table.getn(visibleCars) < 3 then
+  	local car = carFactory();
+  	group:insert( 4, car )
 
-    local removedCars = {}
-    for i = 1, table.getn(visibleCars) do
-		visibleCars[i].y = visibleCars[i].y + visibleCars[i].velocity 
-    	if visibleCars[i].y - 240 > 480 then
-    		table.insert(removedCars, i) 
-    		--table.remove(visibleCars, i)
-    		--visibleCars[i].y = -140
-    		--visibleCars[i].x = getXPosition()
-    	end
-    end
-    for i = 1, table.getn(removedCars) do
-    	table.remove(visibleCars, removedCars[i])
-    end
+  	table.insert(visibleCars, car);
+  end	
+
+  local removedCars = {}
+  for i = 1, table.getn(visibleCars) do
+  	local car = visibleCars[i]
+		car.y = car.y + speed(car.velocity)
+  	if car.y - 240 > 480 then
+  		table.insert(removedCars, i) 
+  		--table.remove(visibleCars, i)
+  		--visibleCars[i].y = -140
+  		--visibleCars[i].x = getXPosition()
+  	end
+
+  	if car.y > heroCar.y + 20 and not car.pointsComputed then
+  		incrementPoints()
+  		car.pointsComputed = true
+  	end
+  end
+  for i = 1, table.getn(removedCars) do  
+  	table.remove(visibleCars, removedCars[i])
+  end
 
 	if street1.y - 240 > 480 then
 		street1.y = streetInitialPosition
@@ -221,17 +274,17 @@ local function onEnterFrame( event )
 		street3.y = streetInitialPosition
 	end
 
-	local speed = 5
+	local movingSpeed = 5
 
 	if movingCarDirection == "RIGHT" then
 		if heroCar.x <= 280 then
-			heroCar.x = heroCar.x + speed
+			heroCar.x = heroCar.x + movingSpeed
 		end
 
 	elseif movingCarDirection == "LEFT" then
-			if heroCar.x >= 40 then
-			heroCar.x = heroCar.x - speed
-		    end
+		if heroCar.x >= 40 then
+			heroCar.x = heroCar.x - movingSpeed
+		end
 	end
 
 
@@ -240,6 +293,7 @@ end
 -----------------------------------------------------------------------------------------
 -- END OF YOUR IMPLEMENTATION
 -----------------------------------------------------------------------------------------
+Runtime:addEventListener( "collision", onCollision )
 
 -- "createScene" event is dispatched if scene's view does not exist
 scene:addEventListener( "createScene", scene )
