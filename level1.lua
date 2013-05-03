@@ -5,6 +5,7 @@
 -----------------------------------------------------------------------------------------
 
 local storyboard = require( "storyboard" )
+local movieclip = require("movieclip")
 local scene = storyboard.newScene()
 
 -- include Corona's "physics" library
@@ -25,6 +26,7 @@ local points = 0
 local pointsText
 local passPoints = 30
 local carSpeed = 0
+local hits = 0
 
 -----------------------------------------------------------------------------------------
 -- BEGINNING OF YOUR IMPLEMENTATION
@@ -63,10 +65,14 @@ function scene:createScene( event )
 
 	function getXPosition()
 		return math.random(40,280)
-	end	
+	end
+
+	explosion = movieclip.newAnim{"images/explode1.png", "images/explode2.png", "images/explode3.png", "images/explode4.png", "images/explode5.png", "images/explode6.png","images/explode7.png","images/explode8.png","images/explode9.png"}
+	explosion.alpha = 0
 
 	--native.systemFontBold
 	pointsText = display.newText(points, 150, 0, native.systemFontBold, 32)
+
 
 	-- create a grey rectangle as the backdrop
 	street1 = display.newImageRect( "images/street.png" , 320, 480)
@@ -153,7 +159,7 @@ function scene:createScene( event )
 	group:insert( leftArrow )
 	group:insert( rightArrow )
 	group:insert( pointsText )
-
+	group:insert( explosion )
 	
 	leftArrow:addEventListener( "touch", onLeftArrowTouch )
 	rightArrow:addEventListener( "touch", onRightArrowTouch )
@@ -197,10 +203,27 @@ function scene:exitScene( event )
 	
 end
 
+function goToMenu()
+	storyboard.gotoScene( "menu", "fade", 500 )
+end
+
+local function death()
+  hits = hits + 1
+  if hits == 3 then
+	explosion.alpha = 1
+	heroCar.alpha = 0
+	explosion.x = heroCar.x
+	explosion.y = heroCar.y	
+	explosion:reverse{ startFrame=6, endFrame=1, loop=0, goToMenu() }
+
+  end
+end
+
 
 local function onCollision( event )
   if ( event.phase == "began" ) then
 			if (event.object1.myName == 'carHero' and event.object2.myName == 'carEnemy') then
+				death()
 				carSpeed = (carSpeed / 2)
 				print('bateu morreu, bateu dead')
 			elseif (event.object1.myName == 'carEnemy' and event.object2.myName == 'carEnemy') then	
@@ -222,6 +245,13 @@ end
 -- If scene's view is removed, scene:destroyScene() will be called just prior to:
 function scene:destroyScene( event )
 	local group = self.view
+	heroCar:removeSelf()	-- widgets must be manually removed
+	car:removeSelf()
+	explosion:removeSelf()
+	 visibleCars = {}
+	 points = 0
+	 carSpeed = 0
+	 hits = 0
 	
 	package.loaded[physics] = nil
 	physics = nil
