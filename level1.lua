@@ -75,7 +75,7 @@ function scene:createScene( event )
 
 	--native.systemFontBold
 	pointsText = display.newText(points, 150, 0, native.systemFontBold, 32)
-	livesText = display.newText('Lives '..(lives - hits), 20, -30, native.systemFontBold, 20)
+	livesText = display.newText('Lives '..(lives - hits), 20, 0, native.systemFontBold, 20)
 
 
 	-- create a grey rectangle as the backdrop
@@ -90,7 +90,7 @@ function scene:createScene( event )
 	street2.y = street1.y - street2.height
 	street3.y = street2.y - street3.height
 
-	streetInitialPosition = street3.y
+	streetInitialPosition = (-street3.height * 3)
 
 	heroCar = display.newImageRect( "images/red_car.png", 34, 56)
 	heroCar.x = screenW / 2 
@@ -262,27 +262,16 @@ local function onEnterFrame( event )
 		end
 
 	
-		if street1.y - street1.height > screenH then
-			street1.y = streetInitialPosition
-		end
 
-		if street2.y - street2.height > screenH then
-			street2.y = streetInitialPosition
-		end
-
-		if street3.y - street3.height > screenH then
-			street3.y = streetInitialPosition
-		end
-
-		-- if street1.y + street1.height < 0 then
-		-- 	street1:translate(  0,street1.height * 3)
-		-- end	
-		-- if street2.y + street2.height < 0 then
-		-- 	street2:translate(  0,street2.height * 3)
-		-- end	
-		-- if street3.y + street3.height < 0 then
-		-- 	street3:translate( 0,street3.height * 3 )
-		-- end	
+		if street1.y - (street1.height/2) - 60 > screenH then
+			street1:translate(  0, streetInitialPosition)
+		end	
+		if street2.y - (street2.height/2) - 60 > screenH then
+			street2:translate(  0, streetInitialPosition)
+		end	
+		if street3.y - (street3.height/2) - 60 > screenH then
+			street3:translate( 0, streetInitialPosition )
+		end	
 
 		local movingSpeed = 5
 

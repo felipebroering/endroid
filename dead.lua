@@ -20,21 +20,21 @@ function scene:createScene( event )
 	background:setReferencePoint( display.TopLeftReferencePoint )
 	background.x, background.y = 0, 0
 
-	totalPoints = display.newText(event.params.points, 150, 50, native.systemFontBold, 32)
+	totalPoints = display.newText(event.params.points, 150, 0, native.systemFontBold, 20)
 	totalPoints.alpha = 0
 
 
 	playBtn = widget.newButton{
-		label="Restart",
+
 		labelColor = { default={255}, over={128} },
-		defaultFile="button.png",
-		overFile="button-over.png",
+		defaultFile="images/button-restart.png",
+		overFile="images/button-restart.png",
 		width=154, height=40,
 		onRelease = onPlayBtnRelease	-- event listener function
 	}
 	playBtn:setReferencePoint( display.CenterReferencePoint )
 	playBtn.x = display.contentWidth*0.5
-	playBtn.y = display.contentHeight - 125
+	playBtn.y = display.contentHeight - 55
 	
 	group:insert( background )
 	group:insert( playBtn )
@@ -45,7 +45,7 @@ function scene:enterScene( event )
 	local group = self.view
 	print('------------------Entercene')
 	storyboard.removeScene("level1")
-	totalPoints.text = event.params.points
+	totalPoints.text = 'Total points '..event.params.points
 	totalPoints.alpha = 1
 end
 
