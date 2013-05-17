@@ -20,7 +20,7 @@ function scene:createScene( event )
 	background:setReferencePoint( display.TopLeftReferencePoint )
 	background.x, background.y = 0, 0
 
-	totalPoints = display.newText(event.params.points, 150, 0, "Comic Sans MS", 20)
+	totalPoints = display.newText(event.params.points, 150, 0, "DroidLogo", 20)
 	totalPoints.alpha = 0
 
 

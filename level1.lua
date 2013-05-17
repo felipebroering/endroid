@@ -25,6 +25,7 @@ local visibleCars = {}
 local points = 0
 local lives = 3
 local livesText
+local speedText
 local pointsText
 local carsExceededText
 local passPoints = 30
@@ -33,6 +34,9 @@ local hits = 0
 local running = true
 local blink = 0
 local carsExceeded = 0
+local lifeImage
+-- local scorePlate
+local convertedSpeed = 0
 
 -----------------------------------------------------------------------------------------
 -- BEGINNING OF YOUR IMPLEMENTATION
@@ -77,11 +81,15 @@ function scene:createScene( event )
 	explosion.alpha = 0
 
 	--native.systemFontBold
-	pointsText = display.newText(points, 150, 0,  "Helvetica", 32)
-	carsExceededText = display.newText(points, 250, 0, "Helvetica", 32)
-	livesText = display.newText('Lives '..(lives - hits), 20, 0, "Comic Sans MS", 20)
-	livesText.font = "Comic Sans MS"
-
+	score = display.newText(points, 150, 0,  "DroidLogo", 12)
+	pointsText = display.newText(points, 150, 16,  "DroidLogo", 22)
+	carsExceededText = display.newText(carsExceeded, 150,40, "DroidLogo", 22)
+	livesText = display.newText('x'..(lives - hits), 36, 0, "DroidLogo", 12)
+	speedText = display.newText('speed '..(convertedSpeed)..'KM/H', 0, 22, "DroidLogo", 12)
+	livesText.font = "DroidLogo"
+	score.text = 'score'
+   -- scorePlate = display.newRect(80,5,150,70)
+   -- scorePlate:setFillColor(black)
 
 	-- create a grey rectangle as the backdrop
 	street1 = display.newImage( "images/street.png", 320,480  )
@@ -96,6 +104,10 @@ function scene:createScene( event )
 	street3.y = street2.y - street3.height
 
 	streetInitialPosition = (-street3.height * 3)
+
+	lifeImage = display.newImageRect( "images/coracao.png", 15, 15)
+	lifeImage.x = 25
+	lifeImage.y = 10
 
 	heroCar = display.newImageRect( "images/red_car.png", 34, 56)
 	heroCar.x = screenW / 2 
@@ -128,13 +140,17 @@ function scene:createScene( event )
 	group:insert( street3 )
 	
 	group:insert( heroCar )
-	
+	--group:insert( scorePlate )
 	group:insert( leftArrow )
 	group:insert( rightArrow )
 	group:insert( pointsText )
 	group:insert( livesText )
 	group:insert( explosion )
 	group:insert( carsExceededText )
+	group:insert( score )
+	group:insert( speedText )
+	group:insert( lifeImage )
+	
 	
 	leftArrow:addEventListener( "touch", onLeftArrowTouch )
 	rightArrow:addEventListener( "touch", onRightArrowTouch )
@@ -203,7 +219,7 @@ end
 local function death()
 		
 	hits = hits + 1
-	livesText.text = 'Lives '..(lives - hits);
+	livesText.text = 'x'..(lives - hits);
 	if hits == lives then
 		running = false
 		explosion.alpha = 1
@@ -255,6 +271,8 @@ local function onEnterFrame( event )
 		carSpeed = carSpeed + 0.1 / 15
 
 		streetSpeed = speed(10)
+		convertedSpeed = streetSpeed * 6
+		speedText.text = math.floor(convertedSpeed)..' KM/H'
 		street1.y = street1.y + streetSpeed
 		street2.y = street2.y + streetSpeed
 		street3.y = street3.y + streetSpeed
