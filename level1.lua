@@ -30,6 +30,7 @@ local passPoints = 30
 local carSpeed = 0
 local hits = 0
 local running = true
+local piscar = 0
 
 -----------------------------------------------------------------------------------------
 -- BEGINNING OF YOUR IMPLEMENTATION
@@ -179,7 +180,24 @@ function goToMenu()
 	storyboard.gotoScene( "dead", options )
 end
 
+	
+function pisca()
+	if piscar < 5 then
+		piscar = piscar + 1
+		local function voltaAlpha()
+			transition.to( heroCar, { time=100, alpha=1, onComplete=pisca} )
+		end
+
+		transition.to( heroCar, { time=100, alpha=0.3, onComplete=voltaAlpha } )
+		print('pisca')
+	else
+		piscar = 0	
+	end
+end	
+
 local function death()
+	pisca()
+
 	hits = hits + 1
 	livesText.text = 'Lives '..(lives - hits);
 	if hits == lives then
