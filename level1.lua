@@ -26,11 +26,13 @@ local points = 0
 local lives = 3
 local livesText
 local pointsText
+local carsExceededText
 local passPoints = 30
 local carSpeed = 0
 local hits = 0
 local running = true
-local piscar = 0
+local blink = 0
+local carsExceeded = 0
 
 -----------------------------------------------------------------------------------------
 -- BEGINNING OF YOUR IMPLEMENTATION
@@ -75,8 +77,10 @@ function scene:createScene( event )
 	explosion.alpha = 0
 
 	--native.systemFontBold
-	pointsText = display.newText(points, 150, 0, native.systemFontBold, 32)
-	livesText = display.newText('Lives '..(lives - hits), 20, 0, native.systemFontBold, 20)
+	pointsText = display.newText(points, 150, 0,  "Helvetica", 32)
+	carsExceededText = display.newText(points, 250, 0, "Helvetica", 32)
+	livesText = display.newText('Lives '..(lives - hits), 20, 0, "Comic Sans MS", 20)
+	livesText.font = "Comic Sans MS"
 
 
 	-- create a grey rectangle as the backdrop
@@ -130,6 +134,7 @@ function scene:createScene( event )
 	group:insert( pointsText )
 	group:insert( livesText )
 	group:insert( explosion )
+	group:insert( carsExceededText )
 	
 	leftArrow:addEventListener( "touch", onLeftArrowTouch )
 	rightArrow:addEventListener( "touch", onRightArrowTouch )
@@ -150,6 +155,8 @@ end
 
 function incrementPoints()
 	points = points + passPoints
+	carsExceeded = carsExceeded + 1
+	carsExceededText.text = carsExceeded
 	pointsText.text = points
 end
 
@@ -181,23 +188,20 @@ function goToMenu()
 end
 
 	
-function pisca()
-	if piscar < 5 then
-		piscar = piscar + 1
-		local function voltaAlpha()
-			transition.to( heroCar, { time=100, alpha=1, onComplete=pisca} )
+function flashes()
+	if blink < 5 then
+		blink = blink + 1
+		local function backAlpha()
+			transition.to( heroCar, { time=100, alpha=1, onComplete=flashes} )
 		end
-
-		transition.to( heroCar, { time=100, alpha=0.3, onComplete=voltaAlpha } )
-		print('pisca')
+		transition.to( heroCar, { time=100, alpha=0.3, onComplete=backAlpha } )
 	else
-		piscar = 0	
+		blink = 0	
 	end
 end	
 
 local function death()
-	pisca()
-
+		
 	hits = hits + 1
 	livesText.text = 'Lives '..(lives - hits);
 	if hits == lives then
@@ -206,23 +210,25 @@ local function death()
 		heroCar.alpha = 0
 		explosion.x = heroCar.x
 		explosion.y = heroCar.y	
+
 		explosion:reverse{ startFrame=6, endFrame=1, loop=0, goToMenu() }
 	end
+
+	if running then
+		flashes()	
+	end		
 end
 
 
 local function onCollision( event )
-	print( event.object1.y )
 	if ( event.phase == "began" ) then
 		if (event.object1.myName == 'carHero' and event.object2.myName == 'carEnemy') then
 			death()
 			carSpeed = (carSpeed / 2)
-			print('bateu morreu, bateu dead')
 			elseif (event.object1.myName == 'carEnemy' and event.object2.myName == 'carEnemy') then	
 				-- if (event.object1.y ~= nil and event.object1.y > 0 and event.object1.y < heroCar.y) then
 				-- 	event.object1.velocity = (streetSpeed/2)
 				-- end
-				print('inimigos se batendo')
 			end
 
 

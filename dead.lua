@@ -20,7 +20,7 @@ function scene:createScene( event )
 	background:setReferencePoint( display.TopLeftReferencePoint )
 	background.x, background.y = 0, 0
 
-	totalPoints = display.newText(event.params.points, 150, 0, native.systemFontBold, 20)
+	totalPoints = display.newText(event.params.points, 150, 0, "Comic Sans MS", 20)
 	totalPoints.alpha = 0
 
 
@@ -47,6 +47,7 @@ function scene:enterScene( event )
 	storyboard.removeScene("level1")
 	totalPoints.text = 'Total points '..event.params.points
 	totalPoints.alpha = 1
+	totalPoints.font = "Comic Sans MS"
 end
 
 function scene:exitScene( event )
