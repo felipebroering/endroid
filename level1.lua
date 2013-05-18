@@ -7,6 +7,7 @@
 local storyboard = require( "storyboard" )
 local movieclip = require("movieclip")
 local scene = storyboard.newScene()
+local widget = require "widget"
 
 -- include Corona's "physics" library
 local physics = require "physics"
@@ -36,6 +37,7 @@ local blink = 0
 local carsExceeded = 0
 local lifeImage
 local scoreImage
+local musicOnBtn 
 -- local scorePlate
 local convertedSpeed = 0
 
@@ -46,6 +48,22 @@ local convertedSpeed = 0
 --		 unless storyboard.removeScene() is called.
 -- 
 -----------------------------------------------------------------------------------------
+function musicLoad()
+	if  settings:retrieve( "music" ) then
+		music:play("level1")
+	else	
+		music:stop()
+	end	
+
+end	
+
+
+local function onMusicBtnRelease()
+	settings:store( "music", (not settings:retrieve( "music" )) )
+	settings:save()
+	 musicLoad()
+	return true	-- indicates successful touch
+end
 
 local function onLeftArrowTouch( event )
 	if event.phase == 'began' then
@@ -73,6 +91,7 @@ end
 -- Called when the scene's view does not exist:
 function scene:createScene( event )
 	group = self.view
+	music:play("level1",music:play("level1"))
 
 	function getXPosition()
 		return math.random(40,280)
@@ -137,6 +156,22 @@ function scene:createScene( event )
 	rightArrow.x = screenW - 40
 	rightArrow.y = screenH - 30
 
+	musicOnBtn = widget.newButton{
+
+		labelColor = { default={255}, over={128} },
+		defaultFile="images/music_on.png",
+		overFile="images/music_on.png",
+		width=25, height=25,
+		onRelease = onMusicBtnRelease	-- event listener function
+	}
+
+	musicOnBtn:setReferencePoint( display.CenterReferencePoint )
+	musicOnBtn.x = display.contentWidth - 30
+	musicOnBtn.y = 20
+
+	 musicLoad()
+	group:insert( musicOnBtn )
+
 	movingCarDirection = "STOPED"
 	
 	
@@ -155,6 +190,7 @@ function scene:createScene( event )
 	group:insert( speedText )
 	group:insert( lifeImage )
 	group:insert( scoreImage )
+	group:insert( musicOnBtn )
 	
 	
 	leftArrow:addEventListener( "touch", onLeftArrowTouch )

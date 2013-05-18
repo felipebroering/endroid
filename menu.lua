@@ -15,13 +15,34 @@ local widget = require "widget"
 
 -- forward declarations and other locals
 local playBtn
+local musicOnBtn 
+local musicOffBtn
+local effectsOnBtn
+local effectsOffBtn
+
+function musicLoad()
+	if  settings:retrieve( "music" ) then
+		music:play("fundo")
+	else	
+		music:stop()
+	end	
+
+end	
 
 -- 'onRelease' event listener for playBtn
 local function onPlayBtnRelease()
 	
 	-- go to level1.lua scene
+	music:stop()
 	storyboard.gotoScene( "level1", "fade", 500 )
 	
+	return true	-- indicates successful touch
+end
+
+function onMusicBtnRelease()
+	settings:store( "music", (not settings:retrieve( "music" )) )
+	settings:save()
+	 musicLoad()
 	return true	-- indicates successful touch
 end
 
@@ -65,6 +86,27 @@ function scene:createScene( event )
 	group:insert( background )
 
 	group:insert( playBtn )
+	
+	music:add( "musica_menu.m4a", "fundo" ) -- A named track.
+	music:add( "musica_fundo.m4a", "level1" ) -- A named track.
+	music:setVolume( 0.2)
+	 -- 
+	 
+	 musicOnBtn = widget.newButton{
+
+		labelColor = { default={255}, over={128} },
+		defaultFile="images/music_on.png",
+		overFile="images/music_on.png",
+		width=25, height=25,
+		onRelease = onMusicBtnRelease	-- event listener function
+	}
+
+	musicOnBtn:setReferencePoint( display.CenterReferencePoint )
+	musicOnBtn.x = display.contentWidth - 30
+	musicOnBtn.y = 20
+
+	 musicLoad()
+	group:insert( musicOnBtn )
 end
 
 -- Called immediately after scene has moved onscreen:

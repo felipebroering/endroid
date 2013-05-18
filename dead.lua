@@ -26,19 +26,19 @@ local function onRowRender( event )
     -- rowTitle:setTextColor( 0, 0, 0 )
 
 
-    local number = display.newText(row, "#" .. row.index .. " - ", 12, 0, "Helvetica-Bold", 18 )
+    local number = display.newText(row, "#" .. row.index .. " - ", 12, 0, "DroidLogo", 18 )
     number:setReferencePoint( display.CenterLeftReferencePoint )
     number.x = 15
     number.y = row.height * 0.5
     number:setTextColor( 0, 0, 0 )
 
-    local name = display.newText(row, scores[ row.index ].name, 12, 0, "Helvetica-Bold", 18 )
+    local name = display.newText(row, scores[ row.index ].name, 12, 0, "DroidLogo", 18 )
     name:setReferencePoint( display.CenterLeftReferencePoint )
     name.x = number.x + number.contentWidth
     name.y = row.height * 0.5
     name:setTextColor( 0, 0, 0 )
 
-    local score = display.newText(row, scores[ row.index ].value, 12, 0, "Helvetica-Bold", 18 )
+    local score = display.newText(row, scores[ row.index ].value, 12, 0, "DroidLogo", 18 )
     score:setReferencePoint( display.CenterLeftReferencePoint )
     score.x = display.contentWidth - score.contentWidth - 20
     score.y = row.height * 0.5

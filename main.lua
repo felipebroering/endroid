@@ -12,6 +12,9 @@ local storyboard = require "storyboard"
 
 require( "ice" )
 GGScore = require( "GGScore" )
+GGMusic = require( "GGMusic" )
+music = GGMusic:new()
+
 board = GGScore:new( "best", true )
 board:setMaxNameLength( 15 )
 
