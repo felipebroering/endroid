@@ -35,6 +35,7 @@ local running = true
 local blink = 0
 local carsExceeded = 0
 local lifeImage
+local scoreImage
 -- local scorePlate
 local convertedSpeed = 0
 
@@ -81,13 +82,12 @@ function scene:createScene( event )
 	explosion.alpha = 0
 
 	--native.systemFontBold
-	score = display.newText(points, 150, 0,  "DroidLogo", 12)
 	pointsText = display.newText(points, 150, 16,  "DroidLogo", 22)
 	carsExceededText = display.newText(carsExceeded, 150,40, "DroidLogo", 22)
 	livesText = display.newText('x'..(lives - hits), 36, 0, "DroidLogo", 12)
 	speedText = display.newText('speed '..(convertedSpeed)..'KM/H', 0, 22, "DroidLogo", 12)
 	livesText.font = "DroidLogo"
-	score.text = 'score'
+	
    -- scorePlate = display.newRect(80,5,150,70)
    -- scorePlate:setFillColor(black)
 
@@ -104,6 +104,11 @@ function scene:createScene( event )
 	street3.y = street2.y - street3.height
 
 	streetInitialPosition = (-street3.height * 3)
+
+	scoreImage = display.newImageRect( "images/score.png", 40, 8)
+	scoreImage.x = 155
+	scoreImage.y = 12
+
 
 	lifeImage = display.newImageRect( "images/coracao.png", 15, 15)
 	lifeImage.x = 25
@@ -147,9 +152,9 @@ function scene:createScene( event )
 	group:insert( livesText )
 	group:insert( explosion )
 	group:insert( carsExceededText )
-	group:insert( score )
 	group:insert( speedText )
 	group:insert( lifeImage )
+	group:insert( scoreImage )
 	
 	
 	leftArrow:addEventListener( "touch", onLeftArrowTouch )

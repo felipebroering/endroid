@@ -10,6 +10,7 @@ local scene = storyboard.newScene()
 -- include Corona's "widget" library
 local widget = require "widget"
 
+
 --------------------------------------------
 
 -- forward declarations and other locals
@@ -35,6 +36,9 @@ end
 -- Called when the scene's view does not exist:
 function scene:createScene( event )
 	local group = self.view
+	local widget = require( "widget" )
+
+
 
 	-- display a background image
 	local background = display.newImageRect( "background.jpg", display.contentWidth, display.contentHeight )
