@@ -50,7 +50,9 @@ local convertedSpeed = 0
 -----------------------------------------------------------------------------------------
 function musicLoad()
 	if  settings:retrieve( "music" ) then
-		music:play("level1")
+		music:add( "musica_fundo.mp3", "level1" )
+		music.loop = true
+		music:play('level1')
 	else	
 		music:stop()
 	end	
@@ -91,7 +93,7 @@ end
 -- Called when the scene's view does not exist:
 function scene:createScene( event )
 	group = self.view
-	music:play("level1",music:play("level1"))
+
 
 	function getXPosition()
 		return math.random(40,280)
@@ -258,7 +260,6 @@ function flashes()
 end	
 
 local function death()
-		
 	hits = hits + 1
 	livesText.text = 'x'..(lives - hits);
 	if hits == lives then
@@ -309,6 +310,7 @@ end
 local function onEnterFrame( event )
 	
 	if running then
+		sound:findFreeChannel()
 		carSpeed = carSpeed + 0.1 / 15
 
 		streetSpeed = speed(10)

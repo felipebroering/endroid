@@ -11,12 +11,24 @@ display.setStatusBar( display.HiddenStatusBar )
 local storyboard = require "storyboard"
 
 require( "ice" )
-GGScore = require( "GGScore" )
-GGMusic = require( "GGMusic" )
+local GGScore = require( "GGScore" )
+local GGMusic = require( "GGMusic" )
+local GGSound = require( "GGSound" )
+
 music = GGMusic:new()
+music:add( "musica_menu.mp3", "menu" ) -- A named track.
+
+sound = GGSound:new{ 1, 2, 3 }
 
 board = GGScore:new( "best", true )
+board:load()
 board:setMaxNameLength( 15 )
+-- sound:add( "explosao.wav", "explosao" )
+-- sound:add( "batida.wav", "batida" )
+-- sound:add( "velocidade1.wav", "velocidade1" )
+-- sound:add( "velocidade2.wav", "velocidade2" )
+-- sound:add( "velocidade3.wav", "velocidade3" )
+-- sound:add( "velocidade4.wav", "velocidade4" )
 
 settings = ice:loadBox( "settings" )
 settings:storeIfNew( "music", true )

@@ -22,7 +22,8 @@ local effectsOffBtn
 
 function musicLoad()
 	if  settings:retrieve( "music" ) then
-		music:play("fundo")
+		music.loop = true
+		music:play("menu")
 	else	
 		music:stop()
 	end	
@@ -87,9 +88,8 @@ function scene:createScene( event )
 
 	group:insert( playBtn )
 	
-	music:add( "musica_menu.m4a", "fundo" ) -- A named track.
-	music:add( "musica_fundo.m4a", "level1" ) -- A named track.
-	music:setVolume( 0.2)
+	
+	-- music:setVolume( 0.8)
 	 -- 
 	 
 	 musicOnBtn = widget.newButton{
@@ -105,7 +105,7 @@ function scene:createScene( event )
 	musicOnBtn.x = display.contentWidth - 30
 	musicOnBtn.y = 20
 
-	 musicLoad()
+	musicLoad()
 	group:insert( musicOnBtn )
 end
 

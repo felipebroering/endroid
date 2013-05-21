@@ -125,14 +125,14 @@ function scene:enterScene( event )
 	totalPoints.font = "DroidLogo"
 	
 	
-	board:add( system.getInfo( "name" ), gameScore )
-	
+	board:add( system.getInfo( "model" ), gameScore )
+	board:save()
 
 	tableView = widget.newTableView
 	{
 	    top = 117,
 	    width = 320, 
-	    height = 247,
+	    height = 209,
 	    listener = tableViewListener,
 	    onRowRender = onRowRender,
 	}
