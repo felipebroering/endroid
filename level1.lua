@@ -180,8 +180,8 @@ function scene:createScene( event )
 	 effectsOnBtn = widget.newButton{
 
 		labelColor = { default={255}, over={128} },
-		defaultFile="images/music_on.png",
-		overFile="images/music_on.png",
+		defaultFile="images/effect_on.png",
+		overFile="images/effect_on.png",
 		width=25, height=25,
 		onRelease = onEffectsBtnRelease	-- event listener function
 	}
