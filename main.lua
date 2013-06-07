@@ -18,17 +18,21 @@ local GGSound = require( "GGSound" )
 music = GGMusic:new()
 music:add( "musica_menu.mp3", "menu" ) -- A named track.
 
-sound = GGSound:new{ 1, 2, 3 }
+sound = GGSound:new{ 1, 2, 3 ,4, 5, 6}
 
 board = GGScore:new( "best", true )
 board:load()
 board:setMaxNameLength( 15 )
--- sound:add( "explosao.wav", "explosao" )
--- sound:add( "batida.wav", "batida" )
--- sound:add( "velocidade1.wav", "velocidade1" )
--- sound:add( "velocidade2.wav", "velocidade2" )
--- sound:add( "velocidade3.wav", "velocidade3" )
--- sound:add( "velocidade4.wav", "velocidade4" )
+sound:add( "explosao.mp3", "explosao" )
+sound:add( "batida.mp3", "batida" )
+sound:add( "curva.mp3", "curva" )
+sound:add( "carro_passando_1.mp3", "carro_passando_1" )
+sound:add( "carro_passando_2.mp3", "carro_passando_2" )
+sound:add( "carro_passando_3.mp3", "carro_passando_3" )
+sound:add( "velocidade1.mp3", "velocidade1" )
+sound:add( "velocidade2.mp3", "velocidade2" )
+sound:add( "velocidade3.mp3", "velocidade3" )
+sound:add( "velocidade4.mp3", "velocidade4" )
 
 settings = ice:loadBox( "settings" )
 settings:storeIfNew( "music", true )

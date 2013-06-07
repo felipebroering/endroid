@@ -30,6 +30,7 @@ function musicLoad()
 
 end	
 
+
 -- 'onRelease' event listener for playBtn
 local function onPlayBtnRelease()
 	
@@ -40,10 +41,18 @@ local function onPlayBtnRelease()
 	return true	-- indicates successful touch
 end
 
+
+function onEffectsBtnRelease()
+	settings:store( "effects", (not settings:retrieve( "effects" )) )
+	settings:save()
+	 
+	return true	-- indicates successful touch
+end
+
 function onMusicBtnRelease()
 	settings:store( "music", (not settings:retrieve( "music" )) )
 	settings:save()
-	 musicLoad()
+	 music:stop()
 	return true	-- indicates successful touch
 end
 
@@ -86,6 +95,7 @@ function scene:createScene( event )
 	-- all display objects must be inserted into group
 	group:insert( background )
 
+	
 	group:insert( playBtn )
 	
 	
@@ -105,8 +115,22 @@ function scene:createScene( event )
 	musicOnBtn.x = display.contentWidth - 30
 	musicOnBtn.y = 20
 
+
+ 	effectsOnBtn = widget.newButton{
+
+		labelColor = { default={255}, over={128} },
+		defaultFile="images/effect_on.png",
+		overFile="images/effect_on.png",
+		width=25, height=25,
+		onRelease = onEffectsBtnRelease	-- event listener function
+	}
+	effectsOnBtn:setReferencePoint( display.CenterReferencePoint )
+	effectsOnBtn.x = display.contentWidth - 60
+	effectsOnBtn.y = 20
+
 	musicLoad()
 	group:insert( musicOnBtn )
+	group:insert( effectsOnBtn )
 end
 
 -- Called immediately after scene has moved onscreen:

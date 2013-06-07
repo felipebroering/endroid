@@ -38,9 +38,11 @@ local carsExceeded = 0
 local lifeImage
 local scoreImage
 local musicOnBtn 
+local effectsOnBtn 
+local engineSound = false
 -- local scorePlate
 local convertedSpeed = 0
-
+somAndando = audio.loadSound( "velocidade1.mp3" )
 -----------------------------------------------------------------------------------------
 -- BEGINNING OF YOUR IMPLEMENTATION
 -- 
@@ -48,6 +50,7 @@ local convertedSpeed = 0
 --		 unless storyboard.removeScene() is called.
 -- 
 -----------------------------------------------------------------------------------------
+
 function musicLoad()
 	if  settings:retrieve( "music" ) then
 		music:add( "musica_fundo.mp3", "level1" )
@@ -58,6 +61,19 @@ function musicLoad()
 	end	
 
 end	
+
+function soundEffectsPlay(effect)
+	if settings:retrieve( "effects" ) then
+		sound:play( effect )
+	end	
+end	
+
+function onEffectsBtnRelease()
+	settings:store( "effects", (not settings:retrieve( "effects" )) )
+	settings:save()
+	 
+	return true	-- indicates successful touch
+end
 
 
 local function onMusicBtnRelease()
@@ -70,6 +86,7 @@ end
 local function onLeftArrowTouch( event )
 	if event.phase == 'began' then
 		movingCarDirection = "LEFT"
+		soundEffectsPlay("curva")
 	end
 
 	if event.phase == 'ended' then
@@ -81,6 +98,7 @@ end
 local function onRightArrowTouch( event )
 	if event.phase == 'began' then
 		movingCarDirection = "RIGHT"
+		soundEffectsPlay("curva")
 	end
 
 	if event.phase == 'ended' then
@@ -98,6 +116,7 @@ function scene:createScene( event )
 	function getXPosition()
 		return math.random(40,280)
 	end
+
 
 	explosion = movieclip.newAnim{"images/explode1.png", "images/explode2.png", "images/explode3.png", "images/explode4.png", "images/explode5.png", "images/explode6.png","images/explode7.png","images/explode8.png","images/explode9.png"}
 	explosion.alpha = 0
@@ -146,9 +165,9 @@ function scene:createScene( event )
 
 	cars = {}
 
-	cars[0] =  {velocity = 5, color = 'blue', points = 30}
-	cars[1] = {velocity = 8, color = 'white', points = 50}
-	cars[2] = {velocity = 3, color = 'yellow', points = 70}
+	cars[0] =  {velocity = 5, color = 'blue', points = 30, number = 0}
+	cars[1] = {velocity = 8, color = 'white', points = 50, number = 1}
+	cars[2] = {velocity = 3, color = 'yellow', points = 70, number = 2}
 
 	leftArrow = display.newImageRect( "images/left_arrow.png", 64, 64)
 	leftArrow.x = 40
@@ -157,6 +176,19 @@ function scene:createScene( event )
 	rightArrow = display.newImageRect( "images/right_arrow.png", 64, 64)
 	rightArrow.x = screenW - 40
 	rightArrow.y = screenH - 30
+
+	 effectsOnBtn = widget.newButton{
+
+		labelColor = { default={255}, over={128} },
+		defaultFile="images/effect_on.png",
+		overFile="images/effect_on.png",
+		width=25, height=25,
+		onRelease = onEffectsBtnRelease	-- event listener function
+	}
+	effectsOnBtn:setReferencePoint( display.CenterReferencePoint )
+	effectsOnBtn.x = display.contentWidth - 60
+	effectsOnBtn.y = 20
+
 
 	musicOnBtn = widget.newButton{
 
@@ -192,6 +224,7 @@ function scene:createScene( event )
 	group:insert( speedText )
 	group:insert( lifeImage )
 	group:insert( scoreImage )
+	group:insert( effectsOnBtn )
 	group:insert( musicOnBtn )
 	
 	
@@ -202,6 +235,7 @@ end
 function carFactory()
 	local carNumber = math.random(0,2)
 	car = display.newImageRect("images/".. cars[carNumber].color .. "_car.png", 34, 56)
+	car.number = cars[carNumber].number
 	car.x = getXPosition()
 	car.y = math.random(200, 600) * -1
 	car.pointsComputed = false
@@ -268,12 +302,13 @@ local function death()
 		heroCar.alpha = 0
 		explosion.x = heroCar.x
 		explosion.y = heroCar.y	
-
+		soundEffectsPlay("explosao")
 		explosion:reverse{ startFrame=6, endFrame=1, loop=0, goToMenu() }
 	end
 
 	if running then
 		flashes()	
+		soundEffectsPlay("batida")
 	end		
 end
 
@@ -307,10 +342,10 @@ local function onCollision( event )
 	physics = nil
 end
 
+
 local function onEnterFrame( event )
 	
 	if running then
-		sound:findFreeChannel()
 		carSpeed = carSpeed + 0.1 / 15
 
 		streetSpeed = speed(10)
@@ -320,6 +355,8 @@ local function onEnterFrame( event )
 		street2.y = street2.y + streetSpeed
 		street3.y = street3.y + streetSpeed
 		
+
+		-- audio.play( somAndando, { channel=2, loops=-1, fadein=1 } ) 
 
 
 		if table.getn(visibleCars) < 3 then
@@ -338,6 +375,14 @@ local function onEnterFrame( event )
 			end
 
 			if car.y > heroCar.y + 20 and not car.pointsComputed then
+				
+				if car.number == 1 then
+					soundEffectsPlay("carro_passando_2")
+				elseif car.number == 2 then
+					soundEffectsPlay("carro_passando_3")
+				else
+					soundEffectsPlay("carro_passando_1")
+				end
 				incrementPoints()
 				car.pointsComputed = true
 			end
