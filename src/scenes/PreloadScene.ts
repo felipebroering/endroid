@@ -48,6 +48,8 @@ export class PreloadScene extends Phaser.Scene {
     this.load.image('speaker_mute', 'assets/images/speaker_mute.png');
     this.load.image('left_arrow', 'assets/images/left_arrow.png');
     this.load.image('right_arrow', 'assets/images/right_arrow.png');
+    this.load.image('turbo', 'assets/images/turbo.png');
+    this.load.image('oil_slick', 'assets/images/oil_slick.png');
 
     // Standard cars
     this.load.image('red_car', 'assets/images/red_car.png');

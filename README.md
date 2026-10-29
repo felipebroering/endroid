@@ -2,6 +2,8 @@
 
 Jogo arcade de corrida *top-down* originalmente criado em Corona SDK (Lua) e migrado para a Web com **Phaser 3**, **Vite** e **TypeScript**.
 
+Jogue em **https://endroid-web.vercel.app/** ou procure **Endroid** no **[Flow of Development](https://flowofdevelopment.com/)**. Instruções de publicação e atualização em [DEPLOYMENT.md](DEPLOYMENT.md).
+
 ## Como Executar
 
 ```bash

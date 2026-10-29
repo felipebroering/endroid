@@ -4,4 +4,7 @@ dist/
 *.keystore
 *.log
 .vite/
+.vercel/
+.local/
+output/youtube-endroid/
 

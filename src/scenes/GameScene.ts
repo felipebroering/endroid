@@ -14,6 +14,15 @@ interface EnemySprite extends Phaser.Physics.Arcade.Sprite {
   carVelocity: number;
   carPoints: number;
   pointsComputed: boolean;
+  canChangeLane: boolean;
+  hasChangedLane: boolean;
+  changeLaneY: number;
+  targetX: number;
+}
+
+interface RoadItemSprite extends Phaser.Physics.Arcade.Sprite {
+  itemType: 'turbo' | 'oil';
+  triggered: boolean;
 }
 
 const ENEMY_TYPES: EnemyCarConfig[] = [
@@ -26,6 +35,7 @@ export class GameScene extends Phaser.Scene {
   private street!: Phaser.GameObjects.TileSprite;
   private heroCar!: Phaser.Physics.Arcade.Sprite;
   private enemiesGroup!: Phaser.Physics.Arcade.Group;
+  private itemsGroup!: Phaser.Physics.Arcade.Group;
 
   private points = 0;
   private lives = 3;
@@ -35,10 +45,14 @@ export class GameScene extends Phaser.Scene {
   private carsExceeded = 0;
   private running = true;
   private isInvulnerable = false;
+  private isSkidding = false;
+  private nextItemTimerMs = 3200;
 
   private movingDirection: 'LEFT' | 'RIGHT' | 'STOPPED' = 'STOPPED';
   private leftPressed = false;
   private rightPressed = false;
+  private lastHeroX = 160;
+  private stationaryTimeMs = 0;
 
   // HUD
   private pointsText!: Phaser.GameObjects.Text;
@@ -67,15 +81,20 @@ export class GameScene extends Phaser.Scene {
     this.carsExceeded = 0;
     this.running = true;
     this.isInvulnerable = false;
+    this.isSkidding = false;
+    this.nextItemTimerMs = Phaser.Math.Between(2800, 4800);
     this.movingDirection = 'STOPPED';
     this.leftPressed = false;
     this.rightPressed = false;
+    this.lastHeroX = width / 2;
+    this.stationaryTimeMs = 0;
 
     // Infinite Scrolling Street (4-lane modern or Original 2013)
     const streetKey = StorageService.getTrackMode() === '2013' ? 'street_2013' : 'street';
     this.street = this.add.tileSprite(width / 2, height / 2, 320, 480, streetKey);
 
-    // Physics group for enemy cars
+    // Physics groups for road items (turbo / oil slick) and enemy cars
+    this.itemsGroup = this.physics.add.group();
     this.enemiesGroup = this.physics.add.group();
 
     // Hero Car (red_car 34x56 as in original level1.lua)
@@ -85,14 +104,22 @@ export class GameScene extends Phaser.Scene {
       .setDepth(10);
 
     const heroBody = this.heroCar.body as Phaser.Physics.Arcade.Body;
-    heroBody.setSize(this.heroCar.width * 0.75, this.heroCar.height * 0.8);
+    heroBody.setSize(Math.round(this.heroCar.width * 0.94), Math.round(this.heroCar.height * 0.92), true);
     heroBody.setImmovable(true);
 
-    // Collision detector
+    // Collision detectors
     this.physics.add.overlap(
       this.heroCar,
       this.enemiesGroup,
       this.onHeroEnemyCollision as Phaser.Types.Physics.Arcade.ArcadePhysicsCallback,
+      undefined,
+      this
+    );
+
+    this.physics.add.overlap(
+      this.heroCar,
+      this.itemsGroup,
+      this.onHeroItemOverlap as Phaser.Types.Physics.Arcade.ArcadePhysicsCallback,
       undefined,
       this
     );
@@ -220,6 +247,23 @@ export class GameScene extends Phaser.Scene {
     // Scroll street texture
     this.street.tilePositionY -= streetSpeed * frameScale;
 
+    // Periodically spawn Turbo or Oil Slick on the track
+    this.nextItemTimerMs -= delta;
+    if (this.nextItemTimerMs <= 0) {
+      this.spawnRoadItem();
+      this.nextItemTimerMs = Phaser.Math.Between(3500, 6500);
+    }
+
+    // Move road items at streetSpeed (fixed to the asphalt) and clean up off-screen items
+    const itemChildren = [...this.itemsGroup.getChildren()] as RoadItemSprite[];
+    for (const item of itemChildren) {
+      if (!item.active) continue;
+      item.y += streetSpeed * frameScale;
+      if (item.y - 100 > 480) {
+        item.destroy();
+      }
+    }
+
     // Spawn enemies up to 3 simultaneous visible cars
     if (this.enemiesGroup.countActive(true) < 3) {
       this.spawnEnemyCar();
@@ -232,6 +276,55 @@ export class GameScene extends Phaser.Scene {
 
       const enemyStep = this.getEffectiveSpeed(car.carVelocity) * frameScale;
       car.y += enemyStep;
+
+      // After 4000 points, some enemy cars change to an adjacent lane as they approach
+      if (car.canChangeLane && !car.hasChangedLane && car.y >= car.changeLaneY) {
+        car.hasChangedLane = true;
+        const laneCenters = [58, 126, 194, 262];
+        // Find current closest lane index (0..3)
+        let currentLaneIdx = 0;
+        let minDist = Infinity;
+        laneCenters.forEach((lc, idx) => {
+          const d = Math.abs(car.x - lc);
+          if (d < minDist) {
+            minDist = d;
+            currentLaneIdx = idx;
+          }
+        });
+
+        const dir = Phaser.Math.RND.pick([-1, 1]);
+        let nextLaneIdx = currentLaneIdx + dir;
+        if (nextLaneIdx < 0 || nextLaneIdx >= laneCenters.length) {
+          nextLaneIdx = currentLaneIdx - dir;
+        }
+
+        const subOffset = Phaser.Math.RND.pick([-15, 0, 15]);
+        const candidateX = laneCenters[nextLaneIdx] + subOffset;
+
+        const blocked = children.some(
+          (other) =>
+            other !== car &&
+            other.active &&
+            Math.abs(other.x - candidateX) < 42 &&
+            Math.abs(other.y - car.y) < 95
+        );
+        if (!blocked) {
+          car.targetX = candidateX;
+        }
+      }
+
+      // Execute smooth horizontal lane change and tilt enemy nose
+      const dx = car.targetX - car.x;
+      if (Math.abs(dx) > 1) {
+        const laneStep = Math.sign(dx) * Math.min(Math.abs(dx), 3.2 * frameScale);
+        car.x += laneStep;
+        const desiredAngle = dx > 0 ? 12 : -12;
+        car.angle = Phaser.Math.Linear(car.angle, desiredAngle, Math.min(1, 0.25 * frameScale));
+      } else {
+        car.x = car.targetX;
+        car.angle = Phaser.Math.Linear(car.angle, 0, Math.min(1, 0.25 * frameScale));
+        if (Math.abs(car.angle) < 0.2) car.angle = 0;
+      }
 
       if (car.y > this.heroCar.y + 20 && !car.pointsComputed) {
         if (car.carNumber === 1) {
@@ -272,11 +365,21 @@ export class GameScene extends Phaser.Scene {
       targetAngle = -14;
     }
 
-    // Smoothly turn the front of the car toward the movement direction and straighten back to 0°
-    const turnLerp = Math.min(1, 0.28 * frameScale);
-    this.heroCar.angle = Phaser.Math.Linear(this.heroCar.angle, targetAngle, turnLerp);
-    if (Math.abs(this.heroCar.angle) < 0.1 && targetAngle === 0) {
-      this.heroCar.angle = 0;
+    // Track whether the player is camping in one horizontal spot (e.g., on a lane line)
+    if (Math.abs(this.heroCar.x - this.lastHeroX) < 3) {
+      this.stationaryTimeMs += delta;
+    } else {
+      this.stationaryTimeMs = 0;
+      this.lastHeroX = this.heroCar.x;
+    }
+
+    // Smoothly turn the front of the car toward the movement direction and straighten back to 0° (when not skidding on oil)
+    if (!this.isSkidding) {
+      const turnLerp = Math.min(1, 0.28 * frameScale);
+      this.heroCar.angle = Phaser.Math.Linear(this.heroCar.angle, targetAngle, turnLerp);
+      if (Math.abs(this.heroCar.angle) < 0.1 && targetAngle === 0) {
+        this.heroCar.angle = 0;
+      }
     }
   }
 
@@ -292,8 +395,30 @@ export class GameScene extends Phaser.Scene {
 
     const pickX = () => {
       if (isModernTrack) {
+        // Each lane is 68px wide; ±16px places the car's side right against the dashed line without crossing it
+        const laneTrajectories = [-16, 0, 16];
+
+        // If player is camping in one spot for > 1s, pick the lane/side closest to the player (still inside the lane!)
+        if (this.stationaryTimeMs > 1000) {
+          this.stationaryTimeMs = 0;
+          let bestX = laneCenters[0];
+          let bestDist = Infinity;
+          for (const lc of laneCenters) {
+            for (const offset of laneTrajectories) {
+              const candidate = lc + offset;
+              const d = Math.abs(candidate - this.heroCar.x);
+              if (d < bestDist) {
+                bestDist = d;
+                bestX = candidate;
+              }
+            }
+          }
+          return bestX + Phaser.Math.Between(-2, 2);
+        }
+
         const laneCenter = laneCenters[Phaser.Math.Between(0, laneCenters.length - 1)];
-        return laneCenter + Phaser.Math.Between(-6, 6);
+        const trajectoryOffset = Phaser.Math.RND.pick(laneTrajectories);
+        return laneCenter + trajectoryOffset + Phaser.Math.Between(-2, 2);
       }
       return Phaser.Math.Between(40, 280);
     };
@@ -317,10 +442,14 @@ export class GameScene extends Phaser.Scene {
     car.carVelocity = cfg.velocity;
     car.carPoints = cfg.points;
     car.pointsComputed = false;
+    car.canChangeLane = this.points >= 4000 && Phaser.Math.Between(1, 100) <= 38;
+    car.hasChangedLane = false;
+    car.changeLaneY = Phaser.Math.Between(25, 175);
+    car.targetX = x;
 
     this.enemiesGroup.add(car);
     const body = car.body as Phaser.Physics.Arcade.Body;
-    body.setSize(car.width * 0.75, car.height * 0.8);
+    body.setSize(Math.round(car.width * 0.94), Math.round(car.height * 0.92), true);
   }
 
   private incrementPoints(carPoints: number): void {
@@ -328,6 +457,101 @@ export class GameScene extends Phaser.Scene {
     this.carsExceeded += 1;
     this.pointsText.setText(String(this.points));
     this.carsExceededText.setText(String(this.carsExceeded));
+  }
+
+  private spawnRoadItem(): void {
+    const isModernTrack = StorageService.getTrackMode() === 'modern';
+    const laneCenters = [58, 126, 194, 262];
+    const x = isModernTrack
+      ? laneCenters[Phaser.Math.Between(0, laneCenters.length - 1)] + Phaser.Math.Between(-12, 12)
+      : Phaser.Math.Between(48, 272);
+
+    const itemType: 'turbo' | 'oil' = Phaser.Math.Between(1, 100) <= 48 ? 'turbo' : 'oil';
+    const textureKey = itemType === 'turbo' ? 'turbo' : 'oil_slick';
+
+    const item = this.physics.add
+      .sprite(x, -60, textureKey)
+      .setDepth(itemType === 'oil' ? 5 : 7) as RoadItemSprite;
+
+    item.itemType = itemType;
+    item.triggered = false;
+
+    this.itemsGroup.add(item);
+    const body = item.body as Phaser.Physics.Arcade.Body;
+    body.setSize(Math.round(item.width * 0.85), Math.round(item.height * 0.85), true);
+  }
+
+  private onHeroItemOverlap(_hero: Phaser.GameObjects.GameObject, itemObj: Phaser.GameObjects.GameObject): void {
+    if (!this.running) return;
+    const item = itemObj as RoadItemSprite;
+    if (!item.active || item.triggered) return;
+
+    if (item.itemType === 'turbo') {
+      item.triggered = true;
+      item.destroy();
+
+      // Increase effective speed by +10%
+      const currentEffective = this.getEffectiveSpeed(10);
+      this.carSpeed += currentEffective * 0.1;
+
+      AudioService.playEffect(this, 'velocidade1', 0.8);
+
+      // Visual turbo feedback
+      this.heroCar.setTint(0x66eeff);
+      this.time.delayedCall(350, () => {
+        if (this.heroCar.active) this.heroCar.clearTint();
+      });
+
+      const popup = this.add
+        .text(this.heroCar.x, this.heroCar.y - 34, '+10% TURBO!', {
+          fontFamily: 'DroidLogo, sans-serif',
+          fontSize: '12px',
+          color: '#00eeff',
+          stroke: '#000000',
+          strokeThickness: 3,
+        })
+        .setOrigin(0.5)
+        .setDepth(35);
+
+      this.tweens.add({
+        targets: popup,
+        y: popup.y - 28,
+        alpha: 0,
+        duration: 650,
+        onComplete: () => popup.destroy(),
+      });
+    } else if (item.itemType === 'oil') {
+      item.triggered = true;
+
+      // Same sound as turning + reduce speed like a hit
+      AudioService.playEffect(this, 'curva', 0.95);
+      this.carSpeed = this.carSpeed / 2;
+
+      // Skid / fishtail animation
+      this.isSkidding = true;
+      const skidDir = Phaser.Math.RND.pick([-1, 1]);
+      const targetSkidX = Phaser.Math.Clamp(this.heroCar.x + skidDir * 22, 40, 280);
+
+      this.tweens.add({
+        targets: this.heroCar,
+        x: targetSkidX,
+        duration: 320,
+        ease: 'Sine.easeOut',
+      });
+
+      this.tweens.chain({
+        targets: this.heroCar,
+        tweens: [
+          { angle: 28 * skidDir, duration: 130 },
+          { angle: -24 * skidDir, duration: 160 },
+          { angle: 14 * skidDir, duration: 140 },
+          { angle: 0, duration: 130 },
+        ],
+        onComplete: () => {
+          this.isSkidding = false;
+        },
+      });
+    }
   }
 
   private onHeroEnemyCollision(_hero: Phaser.GameObjects.GameObject, enemyObj: Phaser.GameObjects.GameObject): void {
