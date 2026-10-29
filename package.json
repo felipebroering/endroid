@@ -1,0 +1,20 @@
+{
+  "name": "endroid-web",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Endroid - Arcade top-down racing game migrated from Corona SDK to Phaser 3",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "phaser": "^3.80.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "vite": "^5.4.0"
+  }
+}
+
