@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { AudioService } from '../services/AudioService';
-import { StorageService } from '../services/StorageService';
+import { CAR_SKINS, StorageService } from '../services/StorageService';
 
 interface EnemyCarConfig {
   velocity: number;
@@ -13,11 +13,13 @@ interface EnemySprite extends Phaser.Physics.Arcade.Sprite {
   carNumber: number;
   carVelocity: number;
   carPoints: number;
+  enemyColor: 'blue' | 'white' | 'yellow';
   pointsComputed: boolean;
   canChangeLane: boolean;
   hasChangedLane: boolean;
   changeLaneY: number;
   targetX: number;
+  isDeloreanEasterEgg?: boolean;
 }
 
 interface RoadItemSprite extends Phaser.Physics.Arcade.Sprite {
@@ -47,6 +49,14 @@ export class GameScene extends Phaser.Scene {
   private isInvulnerable = false;
   private isSkidding = false;
   private nextItemTimerMs = 3200;
+  private deloreanSpawnedInRun = false;
+  private isPlayingDelorean = false;
+  private currentEra: 'present' | 'past' | 'future' | 'west' = 'present';
+  private canJumpToNextEra = true;
+  private isFluxButtonVisible = false;
+  private fluxButtonContainer?: Phaser.GameObjects.Container;
+  private fluxLabel?: Phaser.GameObjects.Text;
+  private fluxBlinkTween?: Phaser.Tweens.Tween;
 
   private movingDirection: 'LEFT' | 'RIGHT' | 'STOPPED' = 'STOPPED';
   private leftPressed = false;
@@ -83,28 +93,70 @@ export class GameScene extends Phaser.Scene {
     this.isInvulnerable = false;
     this.isSkidding = false;
     this.nextItemTimerMs = Phaser.Math.Between(2800, 4800);
+    const initialTrackMode = StorageService.getTrackMode();
+    this.deloreanSpawnedInRun = false;
+    this.isPlayingDelorean = StorageService.getSelectedCar() === 'delorean';
+    this.currentEra =
+      initialTrackMode === 'past'
+        ? 'past'
+        : initialTrackMode === 'future'
+          ? 'future'
+          : initialTrackMode === 'west'
+            ? 'west'
+            : 'present';
+    this.canJumpToNextEra = true;
+    this.isFluxButtonVisible = false;
+    this.fluxButtonContainer = undefined;
+    this.fluxLabel = undefined;
+    this.fluxBlinkTween = undefined;
     this.movingDirection = 'STOPPED';
     this.leftPressed = false;
     this.rightPressed = false;
     this.lastHeroX = width / 2;
     this.stationaryTimeMs = 0;
 
-    // Infinite Scrolling Street (4-lane modern or Original 2013)
-    const streetKey = StorageService.getTrackMode() === '2013' ? 'street_2013' : 'street';
+    // Infinite Scrolling Street (Modern 4-lane, 2013 Original, Past 1955, Future Skyway, or 1885 Old West)
+    const streetKey =
+      initialTrackMode === '2013'
+        ? 'street_2013'
+        : initialTrackMode === 'past'
+          ? 'street_past'
+          : initialTrackMode === 'future'
+            ? 'street_future'
+            : initialTrackMode === 'west'
+              ? 'street_west'
+              : 'street';
     this.street = this.add.tileSprite(width / 2, height / 2, 320, 480, streetKey);
 
     // Physics groups for road items (turbo / oil slick) and enemy cars
     this.itemsGroup = this.physics.add.group();
     this.enemiesGroup = this.physics.add.group();
 
-    // Hero Car (red_car 34x56 as in original level1.lua)
+    // Hero Car (uses selected car skin from StorageService — or era-specific DeLorean)
+    const selectedSkinId = StorageService.getSelectedCar();
+    const skinCfg = CAR_SKINS[selectedSkinId] || CAR_SKINS.red;
+    const isFlyingStart = this.isPlayingDelorean && this.currentEra === 'future';
+    const isWestStart = this.isPlayingDelorean && this.currentEra === 'west';
+    const heroTextureKey = isFlyingStart
+      ? 'car_delorean_flying'
+      : isWestStart
+        ? 'car_delorean_west'
+        : skinCfg.textureKey;
+
     this.heroCar = this.physics.add
-      .sprite(width / 2, height - 100, 'red_car')
-      .setDisplaySize(34, 56)
+      .sprite(width / 2, height - 100, heroTextureKey)
+      .setDisplaySize(
+        isFlyingStart ? 46 : isWestStart ? 38 : 34,
+        isFlyingStart ? 58 : isWestStart ? 76 : 56
+      )
       .setDepth(10);
 
     const heroBody = this.heroCar.body as Phaser.Physics.Arcade.Body;
-    heroBody.setSize(Math.round(this.heroCar.width * 0.94), Math.round(this.heroCar.height * 0.92), true);
+    heroBody.setSize(
+      Math.round(this.heroCar.width * (isFlyingStart ? 0.68 : isWestStart ? 0.76 : 0.94)),
+      Math.round(this.heroCar.height * (isFlyingStart ? 0.90 : isWestStart ? 0.86 : 0.92)),
+      true
+    );
     heroBody.setImmovable(true);
 
     // Collision detectors
@@ -230,6 +282,11 @@ export class GameScene extends Phaser.Scene {
     // Audio buttons & background music
     AudioService.playMusic(this, 'musica_fundo');
     AudioService.createAudioButtons(this, 'musica_fundo');
+
+    // Create hidden Flux Capacitor button when piloting the DeLorean
+    if (this.isPlayingDelorean) {
+      this.createFluxCapacitorButton();
+    }
   }
 
   public update(_time: number, delta: number): void {
@@ -243,6 +300,23 @@ export class GameScene extends Phaser.Scene {
     this.convertedSpeed = streetSpeed * 6;
     const currentKmh = Math.floor(this.convertedSpeed);
     this.speedText.setText(`${currentKmh} KM/H`);
+
+    // Flux Capacitor activation at 142 KM/H (~88 MPH) when driving the DeLorean (Present -> Past -> Future -> West -> Present)
+    const canActivateFlux = this.isPlayingDelorean && this.canJumpToNextEra;
+
+    if (canActivateFlux) {
+      if (currentKmh >= 142) {
+        if (!this.isFluxButtonVisible) {
+          this.showFluxCapacitorButton();
+        }
+        this.speedText.setColor('#00ffff');
+      } else if (this.isFluxButtonVisible) {
+        this.hideFluxCapacitorButton();
+        this.speedText.setColor(
+          this.currentEra === 'past' || this.currentEra === 'west' ? '#ffd27f' : '#ffffff'
+        );
+      }
+    }
 
     // Scroll street texture
     this.street.tilePositionY -= streetSpeed * frameScale;
@@ -390,7 +464,7 @@ export class GameScene extends Phaser.Scene {
   private spawnEnemyCar(): void {
     const typeIndex = Phaser.Math.Between(0, ENEMY_TYPES.length - 1);
     const cfg = ENEMY_TYPES[typeIndex];
-    const isModernTrack = StorageService.getTrackMode() === 'modern';
+    const isModernTrack = StorageService.getTrackMode() !== '2013';
     const laneCenters = [58, 126, 194, 262];
 
     const pickX = () => {
@@ -432,20 +506,43 @@ export class GameScene extends Phaser.Scene {
       x = pickX();
     }
 
-    const y = -Phaser.Math.Between(200, 600);
+    // Easter Egg: Once player reaches 2015 points, spawn the DeLorean coming down the road!
+    const shouldSpawnDelorean =
+      this.points >= 2015 &&
+      !this.deloreanSpawnedInRun &&
+      !StorageService.isCarUnlocked('delorean');
+
+    const y = shouldSpawnDelorean ? -180 : -Phaser.Math.Between(200, 600);
+    const eraEnemyKey =
+      this.currentEra === 'past'
+        ? `vintage_${cfg.color}_car`
+        : this.currentEra === 'future'
+          ? `future_${cfg.color}_car`
+          : this.currentEra === 'west'
+            ? `west_${cfg.color}_car`
+            : `${cfg.color}_car`;
+    const textureKey = shouldSpawnDelorean ? 'car_delorean' : eraEnemyKey;
+    const isWestWagon = !shouldSpawnDelorean && this.currentEra === 'west';
+
     const car = this.physics.add
-      .sprite(x, y, `${cfg.color}_car`)
-      .setDisplaySize(34, 56)
+      .sprite(x, y, textureKey)
+      .setDisplaySize(isWestWagon ? 36 : 34, isWestWagon ? 68 : 56)
       .setDepth(8) as EnemySprite;
 
     car.carNumber = cfg.number;
-    car.carVelocity = cfg.velocity;
-    car.carPoints = cfg.points;
+    car.carVelocity = shouldSpawnDelorean ? 5 : cfg.velocity;
+    car.carPoints = shouldSpawnDelorean ? 88 : cfg.points;
+    car.enemyColor = cfg.color;
     car.pointsComputed = false;
-    car.canChangeLane = this.points >= 4000 && Phaser.Math.Between(1, 100) <= 38;
+    car.canChangeLane = !shouldSpawnDelorean && this.points >= 4000 && Phaser.Math.Between(1, 100) <= 38;
     car.hasChangedLane = false;
     car.changeLaneY = Phaser.Math.Between(25, 175);
     car.targetX = x;
+    car.isDeloreanEasterEgg = shouldSpawnDelorean;
+
+    if (shouldSpawnDelorean) {
+      this.deloreanSpawnedInRun = true;
+    }
 
     this.enemiesGroup.add(car);
     const body = car.body as Phaser.Physics.Arcade.Body;
@@ -460,18 +557,31 @@ export class GameScene extends Phaser.Scene {
   }
 
   private spawnRoadItem(): void {
-    const isModernTrack = StorageService.getTrackMode() === 'modern';
+    const isModernTrack = StorageService.getTrackMode() !== '2013';
     const laneCenters = [58, 126, 194, 262];
     const x = isModernTrack
       ? laneCenters[Phaser.Math.Between(0, laneCenters.length - 1)] + Phaser.Math.Between(-12, 12)
       : Phaser.Math.Between(48, 272);
 
     const itemType: 'turbo' | 'oil' = Phaser.Math.Between(1, 100) <= 48 ? 'turbo' : 'oil';
-    const textureKey = itemType === 'turbo' ? 'turbo' : 'oil_slick';
+    const isFuture = this.currentEra === 'future';
+    const isWest = this.currentEra === 'west';
+    const textureKey =
+      itemType === 'turbo'
+        ? isFuture
+          ? 'turbo_nuclear'
+          : isWest
+            ? 'turbo_west'
+            : 'turbo'
+        : isFuture
+          ? 'future_hazard'
+          : isWest
+            ? 'west_hazard'
+            : 'oil_slick';
 
     const item = this.physics.add
       .sprite(x, -60, textureKey)
-      .setDepth(itemType === 'oil' ? 5 : 7) as RoadItemSprite;
+      .setDepth(itemType === 'oil' ? 6 : 7) as RoadItemSprite;
 
     item.itemType = itemType;
     item.triggered = false;
@@ -496,17 +606,26 @@ export class GameScene extends Phaser.Scene {
 
       AudioService.playEffect(this, 'velocidade1', 0.8);
 
-      // Visual turbo feedback
-      this.heroCar.setTint(0x66eeff);
+      // Visual turbo feedback (Nuclear green in Future, Fiery gold in Old West, cyan otherwise)
+      const isFuture = this.currentEra === 'future';
+      const isWest = this.currentEra === 'west';
+      this.heroCar.setTint(isFuture ? 0x66ff66 : isWest ? 0xffbb44 : 0x66eeff);
       this.time.delayedCall(350, () => {
         if (this.heroCar.active) this.heroCar.clearTint();
       });
 
+      const popupText = isFuture
+        ? '+10% NUCLEAR!'
+        : isWest
+          ? '+10% VAPOR 1885!'
+          : '+10% TURBO!';
+      const popupColor = isFuture ? '#39ff14' : isWest ? '#ffcc33' : '#00eeff';
+
       const popup = this.add
-        .text(this.heroCar.x, this.heroCar.y - 34, '+10% TURBO!', {
+        .text(this.heroCar.x, this.heroCar.y - 34, popupText, {
           fontFamily: 'DroidLogo, sans-serif',
           fontSize: '12px',
-          color: '#00eeff',
+          color: popupColor,
           stroke: '#000000',
           strokeThickness: 3,
         })
@@ -558,6 +677,7 @@ export class GameScene extends Phaser.Scene {
     if (!this.running || this.isInvulnerable) return;
 
     const enemy = enemyObj as EnemySprite;
+    const hitDelorean = !!enemy.isDeloreanEasterEgg;
     enemy.destroy();
 
     this.hits += 1;
@@ -565,11 +685,590 @@ export class GameScene extends Phaser.Scene {
     this.livesText.setText(`x${Math.max(0, this.lives - this.hits)}`);
 
     if (this.hits >= this.lives) {
+      // Player died on this hit -> does NOT unlock the DeLorean!
       this.handleDeath();
     } else {
       AudioService.playEffect(this, 'batida', 0.9);
       this.triggerHitFlashes();
+
+      // Player survived colliding with the DeLorean -> unlocks it for the next match!
+      if (hitDelorean) {
+        StorageService.unlockCar('delorean');
+        StorageService.setSelectedCar('delorean');
+        this.showDeloreanUnlockedBanner();
+      }
     }
+  }
+
+  private showDeloreanUnlockedBanner(): void {
+    const { width } = this.scale;
+    this.cameras.main.flash(300, 0, 220, 255);
+
+    const banner = this.add.container(width / 2, 130).setDepth(45);
+    const bg = this.add.graphics();
+    bg.fillStyle(0x000000, 0.85);
+    bg.lineStyle(2, 0x00eeff, 1);
+    bg.fillRoundedRect(-142, -34, 284, 68, 8);
+    bg.strokeRoundedRect(-142, -34, 284, 68, 8);
+
+    const logo = this.add.image(-95, 0, 'logo_delorean');
+    const maxDim = Math.max(logo.width, logo.height);
+    logo.setScale(52 / maxDim);
+
+    const txt = this.add
+      .text(24, 0, 'DELOREAN LIBERADO!\nDisponível na próxima partida!', {
+        fontFamily: 'DroidLogo, sans-serif',
+        fontSize: '11px',
+        color: '#00eeff',
+        align: 'center',
+      })
+      .setOrigin(0.5);
+
+    banner.add([bg, logo, txt]);
+    banner.setScale(0.2);
+
+    this.tweens.add({
+      targets: banner,
+      scale: 1,
+      duration: 280,
+      ease: 'Back.easeOut',
+      hold: 2200,
+      yoyo: true,
+      onComplete: () => banner.destroy(),
+    });
+  }
+
+  private createFluxCapacitorButton(): void {
+    const { width, height } = this.scale;
+    const container = this.add.container(width / 2, height - 34).setDepth(38);
+    container.setVisible(false);
+
+    // Glowing backdrop ring around the Flux Capacitor
+    const glowBg = this.add.graphics();
+    glowBg.fillStyle(0x001a26, 0.88);
+    glowBg.lineStyle(2, 0x00f0ff, 1);
+    glowBg.fillRoundedRect(-28, -30, 56, 60, 8);
+    glowBg.strokeRoundedRect(-28, -30, 56, 60, 8);
+
+    const fluxImg = this.add.image(0, -3, 'flux_capacitor').setDisplaySize(42, 45);
+
+    const label = this.add
+      .text(0, 22, '88 MPH!', {
+        fontFamily: 'DroidLogo, sans-serif',
+        fontSize: '9px',
+        color: '#00ffff',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5);
+    this.fluxLabel = label;
+
+    const hitZone = this.add
+      .zone(0, 0, 74, 68)
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    hitZone.on('pointerdown', () => {
+      if (this.currentEra === 'present') {
+        this.triggerTimeTravelToPast();
+      } else if (this.currentEra === 'past') {
+        this.triggerTimeTravelToFuture();
+      } else if (this.currentEra === 'future') {
+        this.triggerTimeTravelToWest();
+      } else if (this.currentEra === 'west') {
+        this.triggerTimeTravelToPresent();
+      }
+    });
+
+    container.add([glowBg, fluxImg, label, hitZone]);
+    this.fluxButtonContainer = container;
+  }
+
+  private showFluxCapacitorButton(): void {
+    if (!this.fluxButtonContainer) return;
+    this.isFluxButtonVisible = true;
+    if (this.fluxLabel) {
+      const nextLabel =
+        this.currentEra === 'present'
+          ? '88 MPH!'
+          : this.currentEra === 'past'
+            ? 'FUTURO!'
+            : this.currentEra === 'future'
+              ? '1885!'
+              : 'PRESENTE!';
+      this.fluxLabel.setText(nextLabel);
+    }
+    this.fluxButtonContainer.setVisible(true);
+    this.fluxButtonContainer.setAlpha(1);
+    this.fluxButtonContainer.setScale(1);
+
+    this.fluxBlinkTween?.stop();
+    this.fluxBlinkTween = this.tweens.add({
+      targets: this.fluxButtonContainer,
+      alpha: { from: 1, to: 0.25 },
+      scale: { from: 1.08, to: 0.94 },
+      duration: 240,
+      yoyo: true,
+      repeat: -1,
+    });
+  }
+
+  private hideFluxCapacitorButton(): void {
+    this.isFluxButtonVisible = false;
+    this.fluxBlinkTween?.stop();
+    this.fluxBlinkTween = undefined;
+    if (this.fluxButtonContainer) {
+      this.fluxButtonContainer.setVisible(false);
+    }
+  }
+
+  private triggerTimeTravelToPast(): void {
+    if (this.currentEra !== 'present' || !this.running) return;
+    this.currentEra = 'past';
+    this.canJumpToNextEra = false;
+    this.hideFluxCapacitorButton();
+    StorageService.unlockTrack('past');
+
+    // Play the DeLorean time-travel sound effect
+    AudioService.playEffect(this, 'time_travel', 1.0);
+
+    // Brief invulnerability during the temporal jump
+    this.isInvulnerable = true;
+
+    // Twin fire trails left on the road behind the DeLorean tires
+    const leftTrail = this.add
+      .rectangle(this.heroCar.x - 11, this.heroCar.y + 10, 5, 90, 0xff6600, 0.92)
+      .setDepth(6);
+    const rightTrail = this.add
+      .rectangle(this.heroCar.x + 11, this.heroCar.y + 10, 5, 90, 0xffaa00, 0.92)
+      .setDepth(6);
+
+    this.tweens.add({
+      targets: [leftTrail, rightTrail],
+      y: this.heroCar.y + 150,
+      alpha: 0,
+      scaleY: 1.8,
+      duration: 600,
+      onComplete: () => {
+        leftTrail.destroy();
+        rightTrail.destroy();
+      },
+    });
+
+    // Make the DeLorean blink/flicker with electric cyan energy
+    this.heroCar.setTint(0x88ffff);
+    this.tweens.add({
+      targets: this.heroCar,
+      alpha: 0.15,
+      duration: 75,
+      yoyo: true,
+      repeat: 7,
+      onComplete: () => {
+        if (this.heroCar.active) {
+          this.heroCar.setAlpha(1);
+          this.heroCar.clearTint();
+        }
+        this.isInvulnerable = false;
+      },
+    });
+
+    // Temporal displacement flash & swap road + cars to the Past (1955)
+    this.time.delayedCall(220, () => {
+      if (!this.running) return;
+
+      this.cameras.main.flash(550, 195, 245, 255);
+      this.street.setTexture('street_past');
+      this.speedText.setColor('#ffd27f');
+
+      // Ensure standard DeLorean texture & size in 1955
+      const heroBody = this.heroCar.body as Phaser.Physics.Arcade.Body;
+      this.heroCar.setTexture('car_delorean');
+      this.heroCar.setDisplaySize(34, 56);
+      heroBody.setSize(Math.round(this.heroCar.width * 0.94), Math.round(this.heroCar.height * 0.92), true);
+
+      // Transform all active opponent cars on the road into vintage cars
+      const activeEnemies = this.enemiesGroup.getChildren() as EnemySprite[];
+      for (const enemy of activeEnemies) {
+        if (enemy.active && !enemy.isDeloreanEasterEgg) {
+          enemy.setTexture(`vintage_${enemy.enemyColor}_car`);
+          enemy.setDisplaySize(34, 56);
+        }
+      }
+
+      // Transform any active road items into standard Turbo / Oil Slick
+      const activeItems = this.itemsGroup.getChildren() as RoadItemSprite[];
+      for (const item of activeItems) {
+        if (item.active && !item.triggered) {
+          item.setTexture(item.itemType === 'turbo' ? 'turbo' : 'oil_slick');
+        }
+      }
+
+      // Show retro 1955 arrival banner
+      const { width } = this.scale;
+      const pastBanner = this.add
+        .text(width / 2, 92, '⚡ VIAGEM NO TEMPO: 1955! ⚡', {
+          fontFamily: 'DroidLogo, sans-serif',
+          fontSize: '13px',
+          color: '#ffe082',
+          stroke: '#3e2723',
+          strokeThickness: 4,
+        })
+        .setOrigin(0.5)
+        .setDepth(45);
+
+      this.tweens.add({
+        targets: pastBanner,
+        y: 76,
+        alpha: { from: 1, to: 0 },
+        hold: 1600,
+        duration: 700,
+        onComplete: () => pastBanner.destroy(),
+      });
+
+      // After 3.5 seconds in the Past, allow the Flux Capacitor to activate again for the Future jump!
+      this.time.delayedCall(3500, () => {
+        if (this.running && this.currentEra === 'past') {
+          this.canJumpToNextEra = true;
+        }
+      });
+    });
+  }
+
+  private triggerTimeTravelToFuture(): void {
+    if (this.currentEra !== 'past' || !this.running) return;
+    this.currentEra = 'future';
+    this.canJumpToNextEra = false;
+    this.hideFluxCapacitorButton();
+    StorageService.unlockTrack('future');
+
+    // Play the DeLorean time-travel sound effect
+    AudioService.playEffect(this, 'time_travel', 1.0);
+
+    // Brief invulnerability during the temporal jump to the Future
+    this.isInvulnerable = true;
+
+    // Twin cyan/plasma skyway trails left behind the hover-converted tires
+    const leftTrail = this.add
+      .rectangle(this.heroCar.x - 13, this.heroCar.y + 10, 6, 95, 0x00f0ff, 0.95)
+      .setDepth(6);
+    const rightTrail = this.add
+      .rectangle(this.heroCar.x + 13, this.heroCar.y + 10, 6, 95, 0x80ffff, 0.95)
+      .setDepth(6);
+
+    this.tweens.add({
+      targets: [leftTrail, rightTrail],
+      y: this.heroCar.y + 150,
+      alpha: 0,
+      scaleY: 1.9,
+      duration: 650,
+      onComplete: () => {
+        leftTrail.destroy();
+        rightTrail.destroy();
+      },
+    });
+
+    // Make the DeLorean blink/flicker with electric cyan energy
+    this.heroCar.setTint(0x88ffff);
+    this.tweens.add({
+      targets: this.heroCar,
+      alpha: 0.15,
+      duration: 75,
+      yoyo: true,
+      repeat: 7,
+      onComplete: () => {
+        if (this.heroCar.active) {
+          this.heroCar.setAlpha(1);
+          this.heroCar.clearTint();
+        }
+        this.isInvulnerable = false;
+      },
+    });
+
+    // Temporal displacement flash & swap to Future Skyway + Flying DeLorean with open wheels!
+    this.time.delayedCall(220, () => {
+      if (!this.running) return;
+
+      this.cameras.main.flash(600, 140, 240, 255);
+      this.street.setTexture('street_future');
+      this.speedText.setColor('#00ffff');
+
+      // Switch player car to the Flying DeLorean with open hover-wheels (46x58 so open wheels stick out on the sides)
+      const heroBody = this.heroCar.body as Phaser.Physics.Arcade.Body;
+      this.heroCar.setTexture('car_delorean_flying');
+      this.heroCar.setDisplaySize(46, 58);
+      // Keep physics hitbox matched to the chassis width (not the protruding hover wheels)
+      heroBody.setSize(Math.round(this.heroCar.width * 0.68), Math.round(this.heroCar.height * 0.90), true);
+
+      // Transform all active opponent cars on the skyway into futuristic hover cars
+      const activeEnemies = this.enemiesGroup.getChildren() as EnemySprite[];
+      for (const enemy of activeEnemies) {
+        if (enemy.active && !enemy.isDeloreanEasterEgg) {
+          enemy.setTexture(`future_${enemy.enemyColor}_car`);
+          enemy.setDisplaySize(34, 56);
+        }
+      }
+
+      // Transform any active road items into Nuclear Turbo / Electric Storm Cloud
+      const activeItems = this.itemsGroup.getChildren() as RoadItemSprite[];
+      for (const item of activeItems) {
+        if (item.active && !item.triggered) {
+          item.setTexture(item.itemType === 'turbo' ? 'turbo_nuclear' : 'future_hazard');
+        }
+      }
+
+      // Show futuristic 2015 Skyway arrival banner
+      const { width } = this.scale;
+      const futureBanner = this.add
+        .text(width / 2, 92, '⚡ PISTA VOADORA: FUTURO! ⚡', {
+          fontFamily: 'DroidLogo, sans-serif',
+          fontSize: '13px',
+          color: '#00ffff',
+          stroke: '#002244',
+          strokeThickness: 4,
+        })
+        .setOrigin(0.5)
+        .setDepth(45);
+
+      this.tweens.add({
+        targets: futureBanner,
+        y: 76,
+        alpha: { from: 1, to: 0 },
+        hold: 1800,
+        duration: 700,
+        onComplete: () => futureBanner.destroy(),
+      });
+
+      // After 3.5 seconds in the Future, allow the Flux Capacitor to activate again for the 1885 Old West jump!
+      this.time.delayedCall(3500, () => {
+        if (this.running && this.currentEra === 'future') {
+          this.canJumpToNextEra = true;
+        }
+      });
+    });
+  }
+
+  private triggerTimeTravelToWest(): void {
+    if (this.currentEra !== 'future' || !this.running) return;
+    this.currentEra = 'west';
+    this.canJumpToNextEra = false;
+    this.hideFluxCapacitorButton();
+    StorageService.unlockTrack('west');
+
+    // Play the DeLorean time-travel sound effect
+    AudioService.playEffect(this, 'time_travel', 1.0);
+
+    // Brief invulnerability during the temporal jump to 1885
+    this.isInvulnerable = true;
+
+    // Twin fiery golden trails as the DeLorean jumps from 2015 to 1885
+    const leftTrail = this.add
+      .rectangle(this.heroCar.x - 11, this.heroCar.y + 10, 5, 90, 0xff8800, 0.92)
+      .setDepth(6);
+    const rightTrail = this.add
+      .rectangle(this.heroCar.x + 11, this.heroCar.y + 10, 5, 90, 0xffcc44, 0.92)
+      .setDepth(6);
+
+    this.tweens.add({
+      targets: [leftTrail, rightTrail],
+      y: this.heroCar.y + 150,
+      alpha: 0,
+      scaleY: 1.8,
+      duration: 600,
+      onComplete: () => {
+        leftTrail.destroy();
+        rightTrail.destroy();
+      },
+    });
+
+    // Make the DeLorean blink/flicker with electric cyan energy
+    this.heroCar.setTint(0x88ffff);
+    this.tweens.add({
+      targets: this.heroCar,
+      alpha: 0.15,
+      duration: 75,
+      yoyo: true,
+      repeat: 7,
+      onComplete: () => {
+        if (this.heroCar.active) {
+          this.heroCar.setAlpha(1);
+          this.heroCar.clearTint();
+        }
+        this.isInvulnerable = false;
+      },
+    });
+
+    // Temporal displacement flash & swap to 1885 Old West dirt trail + horse-drawn wagons & horse-drawn DeLorean!
+    this.time.delayedCall(220, () => {
+      if (!this.running) return;
+
+      this.cameras.main.flash(580, 255, 225, 170);
+      this.street.setTexture('street_west');
+      this.speedText.setColor('#ffd27f');
+
+      // Switch player car to the DeLorean pulled by horses with wooden wagon wheels!
+      const heroBody = this.heroCar.body as Phaser.Physics.Arcade.Body;
+      this.heroCar.setTexture('car_delorean_west');
+      this.heroCar.setDisplaySize(38, 76);
+      heroBody.setSize(Math.round(this.heroCar.width * 0.76), Math.round(this.heroCar.height * 0.86), true);
+
+      // Transform all active opponent vehicles into Old West horse-drawn wagons!
+      const activeEnemies = this.enemiesGroup.getChildren() as EnemySprite[];
+      for (const enemy of activeEnemies) {
+        if (enemy.active && !enemy.isDeloreanEasterEgg) {
+          enemy.setTexture(`west_${enemy.enemyColor}_car`);
+          enemy.setDisplaySize(36, 68);
+        }
+      }
+
+      // Transform any active road items into 1885 Steam Log Turbo / Mud Puddle
+      const activeItems = this.itemsGroup.getChildren() as RoadItemSprite[];
+      for (const item of activeItems) {
+        if (item.active && !item.triggered) {
+          item.setTexture(item.itemType === 'turbo' ? 'turbo_west' : 'west_hazard');
+        }
+      }
+
+      // Show 1885 Old West arrival banner
+      const { width } = this.scale;
+      const westBanner = this.add
+        .text(width / 2, 92, '🐎 VELHO OESTE: 1885! 🐎', {
+          fontFamily: 'DroidLogo, sans-serif',
+          fontSize: '13px',
+          color: '#ffdf9e',
+          stroke: '#4e2608',
+          strokeThickness: 4,
+        })
+        .setOrigin(0.5)
+        .setDepth(45);
+
+      this.tweens.add({
+        targets: westBanner,
+        y: 76,
+        alpha: { from: 1, to: 0 },
+        hold: 1800,
+        duration: 700,
+        onComplete: () => westBanner.destroy(),
+      });
+
+      // After 3.5 seconds in the Old West, allow the Flux Capacitor to activate again to return to the Present!
+      this.time.delayedCall(3500, () => {
+        if (this.running && this.currentEra === 'west') {
+          this.canJumpToNextEra = true;
+        }
+      });
+    });
+  }
+
+  private triggerTimeTravelToPresent(): void {
+    if (this.currentEra !== 'west' || !this.running) return;
+    this.currentEra = 'present';
+    this.canJumpToNextEra = false;
+    this.hideFluxCapacitorButton();
+
+    // Play the DeLorean time-travel sound effect
+    AudioService.playEffect(this, 'time_travel', 1.0);
+
+    // Brief invulnerability during the temporal jump back to the Present
+    this.isInvulnerable = true;
+
+    // Twin fire trails left behind the DeLorean
+    const leftTrail = this.add
+      .rectangle(this.heroCar.x - 11, this.heroCar.y + 10, 5, 90, 0xff6600, 0.92)
+      .setDepth(6);
+    const rightTrail = this.add
+      .rectangle(this.heroCar.x + 11, this.heroCar.y + 10, 5, 90, 0xffaa00, 0.92)
+      .setDepth(6);
+
+    this.tweens.add({
+      targets: [leftTrail, rightTrail],
+      y: this.heroCar.y + 150,
+      alpha: 0,
+      scaleY: 1.8,
+      duration: 600,
+      onComplete: () => {
+        leftTrail.destroy();
+        rightTrail.destroy();
+      },
+    });
+
+    // Make the DeLorean blink/flicker with electric cyan energy
+    this.heroCar.setTint(0x88ffff);
+    this.tweens.add({
+      targets: this.heroCar,
+      alpha: 0.15,
+      duration: 75,
+      yoyo: true,
+      repeat: 7,
+      onComplete: () => {
+        if (this.heroCar.active) {
+          this.heroCar.setAlpha(1);
+          this.heroCar.clearTint();
+        }
+        this.isInvulnerable = false;
+      },
+    });
+
+    // Temporal displacement flash & restore Present road, standard DeLorean, and modern opponent cars!
+    this.time.delayedCall(220, () => {
+      if (!this.running) return;
+
+      this.cameras.main.flash(580, 200, 248, 255);
+      const presentStreetKey = StorageService.getTrackMode() === '2013' ? 'street_2013' : 'street';
+      this.street.setTexture(presentStreetKey);
+      this.speedText.setColor('#ffffff');
+
+      // Restore standard DeLorean
+      const heroBody = this.heroCar.body as Phaser.Physics.Arcade.Body;
+      this.heroCar.setTexture('car_delorean');
+      this.heroCar.setDisplaySize(34, 56);
+      heroBody.setSize(Math.round(this.heroCar.width * 0.94), Math.round(this.heroCar.height * 0.92), true);
+
+      // Transform all active opponent vehicles back to modern cars
+      const activeEnemies = this.enemiesGroup.getChildren() as EnemySprite[];
+      for (const enemy of activeEnemies) {
+        if (enemy.active && !enemy.isDeloreanEasterEgg) {
+          enemy.setTexture(`${enemy.enemyColor}_car`);
+          enemy.setDisplaySize(34, 56);
+        }
+      }
+
+      // Restore active road items to standard Turbo / Oil Slick
+      const activeItems = this.itemsGroup.getChildren() as RoadItemSprite[];
+      for (const item of activeItems) {
+        if (item.active && !item.triggered) {
+          item.setTexture(item.itemType === 'turbo' ? 'turbo' : 'oil_slick');
+        }
+      }
+
+      // Show return to Present banner
+      const { width } = this.scale;
+      const presentBanner = this.add
+        .text(width / 2, 92, '⚡ DE VOLTA AO PRESENTE! ⚡', {
+          fontFamily: 'DroidLogo, sans-serif',
+          fontSize: '13px',
+          color: '#00eeff',
+          stroke: '#001a33',
+          strokeThickness: 4,
+        })
+        .setOrigin(0.5)
+        .setDepth(45);
+
+      this.tweens.add({
+        targets: presentBanner,
+        y: 76,
+        alpha: { from: 1, to: 0 },
+        hold: 1800,
+        duration: 700,
+        onComplete: () => presentBanner.destroy(),
+      });
+
+      // After 3.5 seconds in the Present, allow cycling through time travel again!
+      this.time.delayedCall(3500, () => {
+        if (this.running && this.currentEra === 'present') {
+          this.canJumpToNextEra = true;
+        }
+      });
+    });
   }
 
   private triggerHitFlashes(): void {

@@ -1,5 +1,5 @@
 export type CarSkinId = 'red' | 'herbie' | 'delorean' | 'speedracer';
-export type TrackMode = 'modern' | '2013';
+export type TrackMode = 'modern' | '2013' | 'past' | 'future' | 'west';
 
 export interface CarSkinConfig {
   id: CarSkinId;
@@ -83,6 +83,7 @@ interface GameSettings {
   selectedCar: CarSkinId;
   trackMode: TrackMode;
   unlockedCars: Record<CarSkinId, boolean>;
+  unlockedTracks: Record<TrackMode, boolean>;
 }
 
 const SETTINGS_KEY = 'endroid_settings_v2';
@@ -94,6 +95,7 @@ class StorageServiceClass {
 
   constructor() {
     this.settings = this.loadSettings();
+    this.saveSettings();
     this.scores = this.loadScores();
   }
 
@@ -120,6 +122,13 @@ class StorageServiceClass {
         delorean: false,
         speedracer: false,
       },
+      unlockedTracks: {
+        modern: true,
+        '2013': true,
+        past: false,
+        future: false,
+        west: false,
+      },
     };
 
     try {
@@ -132,6 +141,10 @@ class StorageServiceClass {
         unlockedCars: {
           ...defaults.unlockedCars,
           ...(parsed.unlockedCars || {}),
+        },
+        unlockedTracks: {
+          ...defaults.unlockedTracks,
+          ...(parsed.unlockedTracks || {}),
         },
       };
     } catch {
@@ -199,8 +212,27 @@ class StorageServiceClass {
     return this.settings.trackMode || 'modern';
   }
 
+  public isTrackUnlocked(track: TrackMode): boolean {
+    return !!this.settings.unlockedTracks?.[track];
+  }
+
+  public unlockTrack(track: TrackMode): boolean {
+    const wasUnlocked = !!this.settings.unlockedTracks?.[track];
+    this.settings.unlockedTracks[track] = true;
+    this.saveSettings();
+    return !wasUnlocked;
+  }
+
+  public getUnlockedTracks(): TrackMode[] {
+    const order: TrackMode[] = ['modern', '2013', 'past', 'future', 'west'];
+    return order.filter((t) => this.isTrackUnlocked(t));
+  }
+
   public toggleTrackMode(): TrackMode {
-    this.settings.trackMode = this.settings.trackMode === '2013' ? 'modern' : '2013';
+    const unlocked = this.getUnlockedTracks();
+    const currentIdx = unlocked.indexOf(this.getTrackMode());
+    const nextIdx = (currentIdx + 1) % unlocked.length;
+    this.settings.trackMode = unlocked[nextIdx] || 'modern';
     this.saveSettings();
     return this.settings.trackMode;
   }

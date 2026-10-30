@@ -49,7 +49,15 @@ export class PreloadScene extends Phaser.Scene {
     this.load.image('left_arrow', 'assets/images/left_arrow.png');
     this.load.image('right_arrow', 'assets/images/right_arrow.png');
     this.load.image('turbo', 'assets/images/turbo.png');
+    this.load.image('turbo_nuclear', 'assets/images/turbo_nuclear.png');
+    this.load.image('turbo_west', 'assets/images/turbo_west.png');
     this.load.image('oil_slick', 'assets/images/oil_slick.png');
+    this.load.image('future_hazard', 'assets/images/future_hazard.png');
+    this.load.image('west_hazard', 'assets/images/west_hazard.png');
+    this.load.image('flux_capacitor', 'assets/images/flux_capacitor.png');
+    this.load.image('street_past', 'assets/images/street_past.png');
+    this.load.image('street_future', 'assets/images/street_future.png');
+    this.load.image('street_west', 'assets/images/street_west.png');
 
     // Standard cars
     this.load.image('red_car', 'assets/images/red_car.png');
@@ -57,8 +65,25 @@ export class PreloadScene extends Phaser.Scene {
     this.load.image('white_car', 'assets/images/white_car.png');
     this.load.image('yellow_car', 'assets/images/yellow_car.png');
 
+    // Vintage cars (Past mode - 1955)
+    this.load.image('vintage_blue_car', 'assets/images/vintage_blue_car.png');
+    this.load.image('vintage_white_car', 'assets/images/vintage_white_car.png');
+    this.load.image('vintage_yellow_car', 'assets/images/vintage_yellow_car.png');
+
+    // Future hover cars (Future mode - 2015 Skyway)
+    this.load.image('future_blue_car', 'assets/images/future_blue_car.png');
+    this.load.image('future_white_car', 'assets/images/future_white_car.png');
+    this.load.image('future_yellow_car', 'assets/images/future_yellow_car.png');
+
+    // Old West horse-drawn wagons (West mode - 1885)
+    this.load.image('west_blue_car', 'assets/images/west_blue_car.png');
+    this.load.image('west_white_car', 'assets/images/west_white_car.png');
+    this.load.image('west_yellow_car', 'assets/images/west_yellow_car.png');
+
     // Easter Egg cars & logos
     this.load.image('car_delorean', 'assets/images/cars/delorean.png');
+    this.load.image('car_delorean_flying', 'assets/images/cars/delorean_flying.png');
+    this.load.image('car_delorean_west', 'assets/images/cars/delorean_west.png');
     this.load.image('logo_delorean', 'assets/images/cars/delorean-logo.png');
     this.load.image('car_herbie', 'assets/images/cars/herbie.png');
     this.load.image('logo_herbie', 'assets/images/cars/herbie-logo.png');
@@ -80,6 +105,7 @@ export class PreloadScene extends Phaser.Scene {
     this.load.audio('carro_passando_2', 'assets/sounds/carro_passando_2.mp3');
     this.load.audio('carro_passando_3', 'assets/sounds/carro_passando_3.mp3');
     this.load.audio('velocidade1', 'assets/sounds/velocidade1.mp3');
+    this.load.audio('time_travel', 'assets/sounds/time_travel.mp3');
   }
 
   public create(): void {

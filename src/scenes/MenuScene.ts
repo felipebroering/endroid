@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { AudioService } from '../services/AudioService';
-import { StorageService } from '../services/StorageService';
+import { CAR_SKINS, CarSkinId, StorageService } from '../services/StorageService';
 
 export class MenuScene extends Phaser.Scene {
   constructor() {
@@ -17,6 +17,52 @@ export class MenuScene extends Phaser.Scene {
     AudioService.playMusic(this, 'musica_menu');
     AudioService.createAudioButtons(this, 'musica_menu');
 
+    // Show vehicle selector only if at least one Easter Egg car (e.g. DeLorean) has been unlocked
+    const unlockedSkins = (['red', 'delorean'] as CarSkinId[]).filter((id) =>
+      StorageService.isCarUnlocked(id)
+    );
+
+    if (unlockedSkins.length > 1) {
+      const carBtnContainer = this.add.container(width * 0.5, height - 140);
+      const carBg = this.add.graphics();
+      const carPreview = this.add.image(-68, 0, 'red_car').setDisplaySize(16, 26);
+      const carLabel = this.add
+        .text(10, 0, '', {
+          fontFamily: 'DroidLogo, sans-serif',
+          fontSize: '12px',
+          color: '#00eeff',
+        })
+        .setOrigin(0.5);
+
+      const updateCarVisual = () => {
+        const selected = StorageService.getSelectedCar();
+        const cfg = CAR_SKINS[selected] || CAR_SKINS.red;
+        carPreview.setTexture(cfg.textureKey).setDisplaySize(16, 26);
+        carLabel.setText(`Carro: ${cfg.name} ▾`);
+        carLabel.setColor(selected === 'delorean' ? '#00eeff' : '#ffffff');
+
+        carBg.clear();
+        carBg.fillStyle(0x141414, 0.88);
+        carBg.lineStyle(1.5, selected === 'delorean' ? 0x00eeff : 0x666666, 1);
+        carBg.fillRoundedRect(-96, -15, 192, 30, 6);
+        carBg.strokeRoundedRect(-96, -15, 192, 30, 6);
+      };
+
+      updateCarVisual();
+      carBtnContainer.add([carBg, carPreview, carLabel]);
+      carBtnContainer.setSize(192, 30);
+      carBtnContainer.setInteractive({ useHandCursor: true });
+
+      carBtnContainer.on('pointerdown', () => {
+        const current = StorageService.getSelectedCar();
+        const idx = unlockedSkins.indexOf(current);
+        const next = unlockedSkins[(idx + 1) % unlockedSkins.length];
+        StorageService.setSelectedCar(next);
+        AudioService.playEffect(this, 'carro_passando_2', 0.6);
+        updateCarVisual();
+      });
+    }
+
     // Track selector toggle ("4 Faixas" vs "Original 2013")
     const trackBtnContainer = this.add.container(width * 0.5, height - 102);
     const trackBg = this.add.graphics();
@@ -29,13 +75,35 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     const updateTrackVisual = () => {
-      const is2013 = StorageService.getTrackMode() === '2013';
-      trackLabel.setText(is2013 ? 'Pista: Original 2013 ▾' : 'Pista: 4 Faixas (Nova) ▾');
-      trackLabel.setColor(is2013 ? '#ffd24c' : '#ffffff');
+      const mode = StorageService.getTrackMode();
+      let labelText = 'Pista: 4 Faixas (Nova) ▾';
+      let textColor = '#ffffff';
+      let borderColor = 0x666666;
+
+      if (mode === '2013') {
+        labelText = 'Pista: Original 2013 ▾';
+        textColor = '#ffd24c';
+        borderColor = 0xffaa00;
+      } else if (mode === 'past') {
+        labelText = 'Pista: Passado (1955) ▾';
+        textColor = '#ffe082';
+        borderColor = 0xc8963e;
+      } else if (mode === 'future') {
+        labelText = 'Pista: Futuro (Voadora) ▾';
+        textColor = '#00ffff';
+        borderColor = 0x00e5ff;
+      } else if (mode === 'west') {
+        labelText = 'Pista: Velho Oeste (1885) ▾';
+        textColor = '#ffca80';
+        borderColor = 0xc87a32;
+      }
+
+      trackLabel.setText(labelText);
+      trackLabel.setColor(textColor);
 
       trackBg.clear();
       trackBg.fillStyle(0x141414, 0.88);
-      trackBg.lineStyle(1.5, is2013 ? 0xffaa00 : 0x666666, 1);
+      trackBg.lineStyle(1.5, borderColor, 1);
       trackBg.fillRoundedRect(-96, -15, 192, 30, 6);
       trackBg.strokeRoundedRect(-96, -15, 192, 30, 6);
     };
